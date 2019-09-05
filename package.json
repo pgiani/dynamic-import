@@ -1,0 +1,88 @@
+{
+  "name": "meteor-example-optimize-client-bundle",
+  "private": true,
+  "scripts": {
+    "start": "meteor --settings settings-development.json --port 8000",
+    "start-as-prod": "meteor --production --settings settings-development.json --port 8000",
+    "start-profiled": "meteor --extra-packages bundle-visualizer --production --settings settings-development.json --port 8000",
+    "test": "meteor test --driver-package practicalmeteor:mocha --port 5000",
+    "chimp-watch": "chimp --ddp=http://localhost:3000 --watch --mocha --path=tests",
+    "chimp-test": "chimp --ddp=http://localhost:3000 --mocha --path=tests",
+    "staging": "meteor deploy staging.meteor.com --settings settings-development.json",
+    "production": "meteor deploy production.meteor.com --settings settings-production.json"
+  },
+  "devDependencies": {
+    "chimp": "^0.41.2",
+    "eslint": "^4.4.1",
+    "eslint-config-airbnb": "^15.1.0",
+    "eslint-plugin-import": "^2.7.0",
+    "eslint-plugin-jsx-a11y": "^6.0.2",
+    "eslint-plugin-meteor": "^4.1.4",
+    "eslint-plugin-react": "^7.2.0"
+  },
+  "eslintConfig": {
+    "parserOptions": {
+      "ecmaFeatures": {
+        "jsx": true
+      }
+    },
+    "plugins": [
+      "meteor",
+      "react"
+    ],
+    "extends": [
+      "airbnb/base",
+      "plugin:meteor/guide",
+      "plugin:react/recommended"
+    ],
+    "env": {
+      "browser": true
+    },
+    "globals": {
+      "server": false,
+      "browser": false,
+      "expect": false
+    },
+    "rules": {
+      "import/no-unresolved": 0,
+      "import/no-extraneous-dependencies": 0,
+      "import/extensions": 0,
+      "no-underscore-dangle": [
+        "error",
+        {
+          "allow": [
+            "_id",
+            "_ensureIndex",
+            "_verifyEmailToken",
+            "_resetPasswordToken",
+            "_name"
+          ]
+        }
+      ],
+      "class-methods-use-this": 0
+    }
+  },
+  "dependencies": {
+    "babel-eslint": "^7.2.3",
+    "babel-plugin-add-module-exports": "^0.2.1",
+    "babel-runtime": "^6.23.0",
+    "bcrypt": "^1.0.2",
+    "bootstrap": "^3.3.7",
+    "jquery": "^3.2.1",
+    "jquery-validation": "^1.17.0",
+    "meteor-node-stubs": "^0.2.11",
+    "moment": "^2.18.1",
+    "prop-types": "^15.5.8",
+    "react": "^15.6.1",
+    "react-addons-pure-render-mixin": "^15.6.0",
+    "react-addons-shallow-compare": "^15.6.0",
+    "react-bootstrap": "^0.31.0",
+    "react-dates": "^12.4.0",
+    "react-dom": "^15.6.1",
+    "react-komposer": "^2.0.0",
+    "react-loadable": "^4.0.4",
+    "react-router": "^3.0.0",
+    "react-router-bootstrap": "^0.23.2",
+    "simpl-schema": "^0.2.3"
+  }
+}
