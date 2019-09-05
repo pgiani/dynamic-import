@@ -73,11 +73,7 @@ WebApp.rawConnectHandlers.use(function (req, res, next) {
 
 
 /* Exports */
-if (typeof Package === 'undefined') Package = {};
-(function (pkg, symbols) {
-  for (var s in symbols)
-    (s in pkg) || (pkg[s] = symbols[s]);
-})(Package['browser-policy-common'] = {}, {
+Package._define("browser-policy-common", {
   BrowserPolicy: BrowserPolicy
 });
 

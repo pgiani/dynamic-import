@@ -19,12 +19,8 @@ var Session = Package.session.Session;
 var $ = Package.jquery.$;
 var jQuery = Package.jquery.jQuery;
 var meteorInstall = Package.modules.meteorInstall;
-var process = Package.modules.process;
 var meteorBabelHelpers = Package['babel-runtime'].meteorBabelHelpers;
 var Promise = Package.promise.Promise;
-var Symbol = Package['ecmascript-runtime-client'].Symbol;
-var Map = Package['ecmascript-runtime-client'].Map;
-var Set = Package['ecmascript-runtime-client'].Set;
 var Blaze = Package.blaze.Blaze;
 var UI = Package.blaze.UI;
 var Handlebars = Package.blaze.Handlebars;
@@ -42,35 +38,35 @@ var require = meteorInstall({"node_modules":{"meteor":{"themeteorchef:bert":{"te
 //                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
                                                                                                   //
-                                                                                                  // 1
-Template.__checkName("bertAlert");                                                                // 2
-Template["bertAlert"] = new Template("Template.bertAlert", (function() {                          // 3
-  var view = this;                                                                                // 4
-  return HTML.DIV({                                                                               // 5
-    class: function() {                                                                           // 6
+
+Template.__checkName("bertAlert");
+Template["bertAlert"] = new Template("Template.bertAlert", (function() {
+  var view = this;
+  return HTML.DIV({
+    class: function() {
       return [ "bert-alert ", Spacebars.mustache(Spacebars.dot(view.lookup("alert"), "style")), " ", Spacebars.mustache(Spacebars.dot(view.lookup("alert"), "type")), " clearfix" ];
-    }                                                                                             // 8
-  }, "\n    ", HTML.DIV({                                                                         // 9
-    class: "bert-container"                                                                       // 10
-  }, "\n      ", HTML.DIV({                                                                       // 11
-    class: "bert-gem"                                                                             // 12
-  }, "\n        ", HTML.I({                                                                       // 13
-    class: function() {                                                                           // 14
-      return [ "fa ", Spacebars.mustache(Spacebars.dot(view.lookup("alert"), "icon")) ];          // 15
-    }                                                                                             // 16
-  }), "\n      "), "\n      ", HTML.DIV({                                                         // 17
-    class: "bert-content"                                                                         // 18
-  }, "\n        ", Blaze.If(function() {                                                          // 19
-    return Spacebars.call(Spacebars.dot(view.lookup("alert"), "title"));                          // 20
-  }, function() {                                                                                 // 21
-    return HTML.H5(Blaze.View("lookup:alert.title", function() {                                  // 22
-      return Spacebars.mustache(Spacebars.dot(view.lookup("alert"), "title"));                    // 23
-    }));                                                                                          // 24
-  }), "\n        ", HTML.P(Blaze.View("lookup:alert.message", function() {                        // 25
+    }
+  }, "\n    ", HTML.DIV({
+    class: "bert-container"
+  }, "\n      ", HTML.DIV({
+    class: "bert-gem"
+  }, "\n        ", HTML.I({
+    class: function() {
+      return Spacebars.mustache(Spacebars.dot(view.lookup("alert"), "icon"));
+    }
+  }), "\n      "), "\n      ", HTML.DIV({
+    class: "bert-content"
+  }, "\n        ", Blaze.If(function() {
+    return Spacebars.call(Spacebars.dot(view.lookup("alert"), "title"));
+  }, function() {
+    return HTML.H5(Blaze.View("lookup:alert.title", function() {
+      return Spacebars.mustache(Spacebars.dot(view.lookup("alert"), "title"));
+    }));
+  }), "\n        ", HTML.P(Blaze.View("lookup:alert.message", function() {
     return Spacebars.makeRaw(Spacebars.mustache(Spacebars.dot(view.lookup("alert"), "message")));
-  })), "\n      "), "\n    "), "\n  ");                                                           // 27
-}));                                                                                              // 28
-                                                                                                  // 29
+  })), "\n      "), "\n    "), "\n  ");
+}));
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 },"bert-alert.js":function(){
@@ -81,11 +77,12 @@ Template["bertAlert"] = new Template("Template.bertAlert", (function() {        
 //                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
                                                                                                   //
-Template.bertAlert.helpers({                                                                      // 1
-  alert: function () {                                                                            // 2
-    return Session.get('bertAlert');                                                              // 2
-  }                                                                                               // 2
-});                                                                                               // 1
+Template.bertAlert.helpers({
+  alert() {
+    return Session.get('bertAlert');
+  }
+
+});
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 },"template.body.js":function(){
@@ -96,16 +93,16 @@ Template.bertAlert.helpers({                                                    
 //                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
                                                                                                   //
-                                                                                                  // 1
-Template.body.addContent((function() {                                                            // 2
-  var view = this;                                                                                // 3
-  return Spacebars.include(view.lookupTemplate("bertAlert"));                                     // 4
-}));                                                                                              // 5
-Meteor.startup(Template.body.renderToDocument);                                                   // 6
-                                                                                                  // 7
+
+Template.body.addContent((function() {
+  var view = this;
+  return Spacebars.include(view.lookupTemplate("bertAlert"));
+}));
+Meteor.startup(Template.body.renderToDocument);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-}},"bert.js":function(require){
+}},"bert.js":function(){
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                //
@@ -113,155 +110,101 @@ Meteor.startup(Template.body.renderToDocument);                                 
 //                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
                                                                                                   //
-var _typeof2 = require("babel-runtime/helpers/typeof");                                           //
-                                                                                                  //
-var _typeof3 = _interopRequireDefault(_typeof2);                                                  //
-                                                                                                  //
-var _classCallCheck2 = require("babel-runtime/helpers/classCallCheck");                           //
-                                                                                                  //
-var _classCallCheck3 = _interopRequireDefault(_classCallCheck2);                                  //
-                                                                                                  //
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { "default": obj }; }
-                                                                                                  //
-var BertAlert = function () {                                                                     //
-  function BertAlert() {                                                                          // 2
-    (0, _classCallCheck3.default)(this, BertAlert);                                               // 2
+class BertAlert {
+  constructor() {
     this.styles = ['fixed-top', 'fixed-bottom', 'growl-top-left', 'growl-top-right', 'growl-bottom-left', 'growl-bottom-right'];
-    this.types = ['default', 'success', 'info', 'warning', 'danger'];                             // 12
-    this.icons = {                                                                                // 20
-      "default": 'fa-bell',                                                                       // 21
-      success: 'fa-check',                                                                        // 22
-      info: 'fa-info',                                                                            // 23
-      warning: 'fa-warning',                                                                      // 24
-      danger: 'fa-remove'                                                                         // 25
-    };                                                                                            // 20
-    this.defaults = {                                                                             // 28
-      hideDelay: 3500,                                                                            // 29
-      style: 'fixed-top',                                                                         // 30
-      type: 'default'                                                                             // 31
-    };                                                                                            // 28
-  }                                                                                               // 33
-                                                                                                  //
-  BertAlert.prototype.alert = function () {                                                       //
-    function alert() {                                                                            //
-      var _this = this,                                                                           // 35
-          _arguments = arguments;                                                                 // 35
-                                                                                                  //
-      if (this.isVisible()) {                                                                     // 36
-        this.hide();                                                                              // 37
-        setTimeout(function () {                                                                  // 38
-          _this.handleAlert(_arguments);                                                          // 38
-        }, 300);                                                                                  // 38
-      } else {                                                                                    // 39
-        this.handleAlert(arguments);                                                              // 40
-      }                                                                                           // 41
-    }                                                                                             // 42
-                                                                                                  //
-    return alert;                                                                                 //
-  }();                                                                                            //
-                                                                                                  //
-  BertAlert.prototype.isVisible = function () {                                                   //
-    function isVisible() {                                                                        //
-      return $('.bert-alert').hasClass('show');                                                   // 45
-    }                                                                                             // 46
-                                                                                                  //
-    return isVisible;                                                                             //
-  }();                                                                                            //
-                                                                                                  //
-  BertAlert.prototype.handleAlert = function () {                                                 //
-    function handleAlert(alert) {                                                                 //
-      var _this2 = this;                                                                          // 48
-                                                                                                  //
-      this.registerClickHandler();                                                                // 49
-      this.setBertOnSession(alert);                                                               // 50
-      setTimeout(function () {                                                                    // 51
-        _this2.show();                                                                            // 51
-      }, 20);                                                                                     // 51
-      this.bertTimer();                                                                           // 52
-    }                                                                                             // 53
-                                                                                                  //
-    return handleAlert;                                                                           //
-  }();                                                                                            //
-                                                                                                  //
-  BertAlert.prototype.registerClickHandler = function () {                                        //
-    function registerClickHandler() {                                                             //
-      var _this3 = this;                                                                          // 55
-                                                                                                  //
-      $('.bert-alert').off('click');                                                              // 56
-      $('.bert-alert').on('click', function () {                                                  // 57
-        _this3.hide();                                                                            // 57
-      });                                                                                         // 57
-    }                                                                                             // 58
-                                                                                                  //
-    return registerClickHandler;                                                                  //
-  }();                                                                                            //
-                                                                                                  //
-  BertAlert.prototype.bertTimer = function () {                                                   //
-    function bertTimer() {                                                                        //
-      var _this4 = this;                                                                          // 60
-                                                                                                  //
-      clearTimeout(this.timer);                                                                   // 61
-      this.timer = setTimeout(function () {                                                       // 62
-        _this4.hide();                                                                            // 62
-      }, this.defaults.hideDelay);                                                                // 62
-      return this.timer;                                                                          // 63
-    }                                                                                             // 64
-                                                                                                  //
-    return bertTimer;                                                                             //
-  }();                                                                                            //
-                                                                                                  //
-  BertAlert.prototype.show = function () {                                                        //
-    function show() {                                                                             //
-      $('.bert-alert').addClass('show').delay(25).queue(function () {                             // 67
-        $('.bert-alert').addClass('animate').dequeue();                                           // 68
-      });                                                                                         // 69
-    }                                                                                             // 70
-                                                                                                  //
-    return show;                                                                                  //
-  }();                                                                                            //
-                                                                                                  //
-  BertAlert.prototype.hide = function () {                                                        //
-    function hide() {                                                                             //
-      $('.bert-alert').removeClass('animate');                                                    // 73
-      setTimeout(function () {                                                                    // 74
-        $('.bert-alert').removeClass('show');                                                     // 75
-        Session.set('bertAlert', null);                                                           // 76
-      }, 300);                                                                                    // 77
-    }                                                                                             // 78
-                                                                                                  //
-    return hide;                                                                                  //
-  }();                                                                                            //
-                                                                                                  //
-  BertAlert.prototype.setBertOnSession = function () {                                            //
-    function setBertOnSession(alert) {                                                            //
-      if ((0, _typeof3.default)(alert[0]) === 'object') {                                         // 81
-        var type = alert[0].type || this.defaults.type;                                           // 82
-        Session.set('bertAlert', {                                                                // 84
-          title: alert[0].title || "",                                                            // 85
-          message: alert[0].message || "",                                                        // 86
-          type: type,                                                                             // 87
-          style: alert[0].style || this.defaults.style,                                           // 88
-          icon: alert[0].icon || this.icons[type]                                                 // 89
-        });                                                                                       // 84
-      } else {                                                                                    // 91
-        var _type = alert[1] || this.defaults.type;                                               // 92
-                                                                                                  //
-        Session.set('bertAlert', {                                                                // 94
-          message: alert[0] || "",                                                                // 95
-          type: _type,                                                                            // 96
-          style: alert[2] || this.defaults.style,                                                 // 97
-          icon: alert[3] || this.icons[_type]                                                     // 98
-        });                                                                                       // 94
-      }                                                                                           // 100
-    }                                                                                             // 101
-                                                                                                  //
-    return setBertOnSession;                                                                      //
-  }();                                                                                            //
-                                                                                                  //
-  return BertAlert;                                                                               //
-}();                                                                                              //
-                                                                                                  //
-Bert = new BertAlert();                                                                           // 104
+    this.types = ['default', 'success', 'info', 'warning', 'danger'];
+    this.icons = {
+      default: 'fas fa-bell',
+      success: 'fas fa-check',
+      info: 'fas fa-info',
+      warning: 'fas fa-exclamation-triangle',
+      danger: 'fas fa-times'
+    };
+    this.defaults = {
+      hideDelay: 3500,
+      style: 'fixed-top',
+      type: 'default'
+    };
+  }
+
+  alert() {
+    if (this.isVisible()) {
+      this.hide();
+      setTimeout(() => {
+        this.handleAlert(arguments);
+      }, 300);
+    } else {
+      this.handleAlert(arguments);
+    }
+  }
+
+  isVisible() {
+    return $('.bert-alert').hasClass('show');
+  }
+
+  handleAlert(alert) {
+    this.registerClickHandler();
+    this.setBertOnSession(alert);
+    setTimeout(() => {
+      this.show();
+    }, 20);
+    this.bertTimer();
+  }
+
+  registerClickHandler() {
+    $('.bert-alert').off('click');
+    $('.bert-alert').on('click', () => {
+      this.hide();
+    });
+  }
+
+  bertTimer() {
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => {
+      this.hide();
+    }, this.defaults.hideDelay);
+    return this.timer;
+  }
+
+  show() {
+    $('.bert-alert').addClass('show').delay(25).queue(() => {
+      $('.bert-alert').addClass('animate').dequeue();
+    });
+  }
+
+  hide() {
+    $('.bert-alert').removeClass('animate');
+    setTimeout(() => {
+      $('.bert-alert').removeClass('show');
+      Session.set('bertAlert', null);
+    }, 300);
+  }
+
+  setBertOnSession(alert) {
+    if (typeof alert[0] === 'object') {
+      let type = alert[0].type || this.defaults.type;
+      Session.set('bertAlert', {
+        title: alert[0].title || "",
+        message: alert[0].message || "",
+        type: type,
+        style: alert[0].style || this.defaults.style,
+        icon: alert[0].icon || this.icons[type]
+      });
+    } else {
+      let type = alert[1] || this.defaults.type;
+      Session.set('bertAlert', {
+        message: alert[0] || "",
+        type: type,
+        style: alert[2] || this.defaults.style,
+        icon: alert[3] || this.icons[type]
+      });
+    }
+  }
+
+}
+
+Bert = new BertAlert();
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 }}}}},{
@@ -272,17 +215,14 @@ Bert = new BertAlert();                                                         
     ".scss"
   ]
 });
-require("./node_modules/meteor/themeteorchef:bert/templates/template.bert-alert.js");
-require("./node_modules/meteor/themeteorchef:bert/templates/bert-alert.js");
-require("./node_modules/meteor/themeteorchef:bert/templates/template.body.js");
-require("./node_modules/meteor/themeteorchef:bert/bert.js");
+
+require("/node_modules/meteor/themeteorchef:bert/templates/template.bert-alert.js");
+require("/node_modules/meteor/themeteorchef:bert/templates/bert-alert.js");
+require("/node_modules/meteor/themeteorchef:bert/templates/template.body.js");
+require("/node_modules/meteor/themeteorchef:bert/bert.js");
 
 /* Exports */
-if (typeof Package === 'undefined') Package = {};
-(function (pkg, symbols) {
-  for (var s in symbols)
-    (s in pkg) || (pkg[s] = symbols[s]);
-})(Package['themeteorchef:bert'] = {}, {
+Package._define("themeteorchef:bert", {
   Bert: Bert
 });
 

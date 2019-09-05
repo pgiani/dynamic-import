@@ -3,7 +3,6 @@
 
 
 /* Exports */
-if (typeof Package === 'undefined') Package = {};
-Package['static-html'] = {};
+Package._define("static-html");
 
 })();

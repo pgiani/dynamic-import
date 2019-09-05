@@ -5,7 +5,6 @@ var Meteor = Package.meteor.Meteor;
 var global = Package.meteor.global;
 var meteorEnv = Package.meteor.meteorEnv;
 var meteorInstall = Package.modules.meteorInstall;
-var process = Package.modules.process;
 var _ = Package.underscore._;
 var BrowserPolicy = Package['browser-policy-common'].BrowserPolicy;
 
@@ -68,10 +67,10 @@ exports.BrowserPolicy = BrowserPolicy;
     ".json"
   ]
 });
-var exports = require("./node_modules/meteor/browser-policy-framing/browser-policy-framing.js");
+
+var exports = require("/node_modules/meteor/browser-policy-framing/browser-policy-framing.js");
 
 /* Exports */
-if (typeof Package === 'undefined') Package = {};
-Package['browser-policy-framing'] = exports;
+Package._define("browser-policy-framing", exports);
 
 })();

@@ -5,7 +5,6 @@ var Meteor = Package.meteor.Meteor;
 var global = Package.meteor.global;
 var meteorEnv = Package.meteor.meteorEnv;
 var meteorInstall = Package.modules.meteorInstall;
-var process = Package.modules.process;
 
 /* Package-scope variables */
 var GeoJSON;
@@ -419,14 +418,11 @@ exports.GeoJSON = require("./geojson-utils.js");
     ".json"
   ]
 });
-var exports = require("./node_modules/meteor/geojson-utils/main.js");
+
+var exports = require("/node_modules/meteor/geojson-utils/main.js");
 
 /* Exports */
-if (typeof Package === 'undefined') Package = {};
-(function (pkg, symbols) {
-  for (var s in symbols)
-    (s in pkg) || (pkg[s] = symbols[s]);
-})(Package['geojson-utils'] = exports, {
+Package._define("geojson-utils", exports, {
   GeoJSON: GeoJSON
 });
 

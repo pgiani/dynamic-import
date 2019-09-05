@@ -15,11 +15,8 @@ var Meteor = Package.meteor.Meteor;
 var global = Package.meteor.global;
 var meteorEnv = Package.meteor.meteorEnv;
 var meteorInstall = Package.modules.meteorInstall;
-var process = Package.modules.process;
 var Promise = Package.promise.Promise;
-var DDP = Package['ddp-client'].DDP;
-var check = Package.check.check;
-var Match = Package.check.Match;
+var fetch = Package.fetch.fetch;
 
 var require = meteorInstall({"node_modules":{"meteor":{"dynamic-import":{"client.js":function(require,exports,module){
 
@@ -29,165 +26,180 @@ var require = meteorInstall({"node_modules":{"meteor":{"dynamic-import":{"client
 //                                                                             //
 /////////////////////////////////////////////////////////////////////////////////
                                                                                //
-var Module = module.constructor;                                               // 1
-var cache = require("./cache.js");                                             // 2
-                                                                               // 3
-// Call module.dynamicImport(id) to fetch a module and any/all of its          // 4
-// dependencies that have not already been fetched, and evaluate them as       // 5
-// soon as they arrive. This runtime API makes it very easy to implement       // 6
-// ECMAScript dynamic import(...) syntax.                                      // 7
-Module.prototype.dynamicImport = function (id) {                               // 8
-  var module = this;                                                           // 9
-  return module.prefetch(id).then(function () {                                // 10
-    return getNamespace(module, id);                                           // 11
-  });                                                                          // 12
-};                                                                             // 13
-                                                                               // 14
-// Called by Module.prototype.prefetch if there are any missing dynamic        // 15
-// modules that need to be fetched.                                            // 16
-meteorInstall.fetch = function (ids) {                                         // 17
-  var tree = Object.create(null);                                              // 18
-  var versions = Object.create(null);                                          // 19
-  var dynamicVersions = require("./dynamic-versions.js");                      // 20
-  var missing;                                                                 // 21
-                                                                               // 22
-  Object.keys(ids).forEach(function (id) {                                     // 23
-    var version = getFromTree(dynamicVersions, id);                            // 24
-    if (version) {                                                             // 25
-      versions[id] = version;                                                  // 26
-    } else {                                                                   // 27
-      addToTree(missing = missing || Object.create(null), id, 1);              // 28
-    }                                                                          // 29
-  });                                                                          // 30
-                                                                               // 31
-  return cache.checkMany(versions).then(function (sources) {                   // 32
-    Object.keys(sources).forEach(function (id) {                               // 33
-      var source = sources[id];                                                // 34
-      if (source) {                                                            // 35
-        var info = ids[id];                                                    // 36
-        addToTree(tree, id, makeModuleFunction(id, source, info.options));     // 37
-      } else {                                                                 // 38
-        addToTree(missing = missing || Object.create(null), id, 1);            // 39
-      }                                                                        // 40
-    });                                                                        // 41
-                                                                               // 42
-    return missing && fetchMissing(missing).then(function (results) {          // 43
-      var versionsAndSourcesById = Object.create(null);                        // 44
-      var flatResults = flattenModuleTree(results);                            // 45
-                                                                               // 46
-      Object.keys(flatResults).forEach(function (id) {                         // 47
-        var source = flatResults[id];                                          // 48
-        var info = ids[id];                                                    // 49
-                                                                               // 50
-        addToTree(tree, id, makeModuleFunction(id, source, info.options));     // 51
-                                                                               // 52
-        var version = getFromTree(dynamicVersions, id);                        // 53
-        if (version) {                                                         // 54
-          versionsAndSourcesById[id] = {                                       // 55
-            version: version,                                                  // 56
-            source: source                                                     // 57
-          };                                                                   // 58
-        }                                                                      // 59
-      });                                                                      // 60
-                                                                               // 61
-      cache.setMany(versionsAndSourcesById);                                   // 62
-    });                                                                        // 63
-                                                                               // 64
-  }).then(function () {                                                        // 65
-    return tree;                                                               // 66
-  });                                                                          // 67
-};                                                                             // 68
-                                                                               // 69
-function flattenModuleTree(tree) {                                             // 70
-  var parts = [""];                                                            // 71
-  var result = Object.create(null);                                            // 72
-                                                                               // 73
-  function walk(t) {                                                           // 74
-    if (t && typeof t === "object") {                                          // 75
-      Object.keys(t).forEach(function (key) {                                  // 76
-        parts.push(key);                                                       // 77
-        walk(t[key]);                                                          // 78
-        parts.pop();                                                           // 79
-      });                                                                      // 80
-    } else if (typeof t === "string") {                                        // 81
-      result[parts.join("/")] = t;                                             // 82
-    }                                                                          // 83
-  }                                                                            // 84
-                                                                               // 85
-  walk(tree);                                                                  // 86
-                                                                               // 87
-  return result;                                                               // 88
-}                                                                              // 89
-                                                                               // 90
-function makeModuleFunction(id, source, options) {                             // 91
-  // By calling (options && options.eval || eval) in a wrapper function,       // 92
-  // we delay the cost of parsing and evaluating the module code until the     // 93
-  // module is first imported.                                                 // 94
-  return function () {                                                         // 95
-    // If an options.eval function was provided in the second argument to      // 96
-    // meteorInstall when this bundle was first installed, use that            // 97
-    // function to parse and evaluate the dynamic module code in the scope     // 98
-    // of the package. Otherwise fall back to indirect (global) eval.          // 99
-    return (options && options.eval || eval)(                                  // 100
-      // Wrap the function(require,exports,module){...} expression in          // 101
-      // parentheses to force it to be parsed as an expression.                // 102
-      "(" + source + ")\n//# sourceURL=" + id                                  // 103
-    ).apply(this, arguments);                                                  // 104
-  };                                                                           // 105
-}                                                                              // 106
-                                                                               // 107
-function fetchMissing(missingTree) {                                           // 108
-  // Update lastFetchMissingPromise immediately, without waiting for           // 109
-  // the results to be delivered.                                              // 110
-  return new Promise(function (resolve, reject) {                              // 111
-    Meteor.call(                                                               // 112
-      "__dynamicImport",                                                       // 113
-      missingTree,                                                             // 114
-      function (error, resultsTree) {                                          // 115
-        error ? reject(error) : resolve(resultsTree);                          // 116
-      }                                                                        // 117
-    );                                                                         // 118
-  });                                                                          // 119
-}                                                                              // 120
-                                                                               // 121
-function getFromTree(tree, id) {                                               // 122
-  id.split("/").every(function (part) {                                        // 123
-    return ! part || (tree = tree[part]);                                      // 124
-  });                                                                          // 125
-                                                                               // 126
-  return tree;                                                                 // 127
-}                                                                              // 128
-                                                                               // 129
-function addToTree(tree, id, value) {                                          // 130
-  var parts = id.split("/");                                                   // 131
-  var lastIndex = parts.length - 1;                                            // 132
-  parts.forEach(function (part, i) {                                           // 133
-    if (part) {                                                                // 134
-      tree = tree[part] = tree[part] ||                                        // 135
-        (i < lastIndex ? Object.create(null) : value);                         // 136
-    }                                                                          // 137
-  });                                                                          // 138
-}                                                                              // 139
-                                                                               // 140
-function getNamespace(module, id) {                                            // 141
-  var namespace;                                                               // 142
-                                                                               // 143
-  module.watch(module.require(id), {                                           // 144
-    "*": function (ns) {                                                       // 145
-      namespace = ns;                                                          // 146
-    }                                                                          // 147
-  });                                                                          // 148
-                                                                               // 149
-  // This helps with Babel interop, since we're not just returning the         // 150
-  // module.exports object.                                                    // 151
-  Object.defineProperty(namespace, "__esModule", {                             // 152
-    value: true,                                                               // 153
-    enumerable: false                                                          // 154
-  });                                                                          // 155
-                                                                               // 156
-  return namespace;                                                            // 157
-}                                                                              // 158
-                                                                               // 159
+var Module = module.constructor;
+var cache = require("./cache.js");
+var meteorInstall = require("meteor/modules").meteorInstall;
+
+// Call module.dynamicImport(id) to fetch a module and any/all of its
+// dependencies that have not already been fetched, and evaluate them as
+// soon as they arrive. This runtime API makes it very easy to implement
+// ECMAScript dynamic import(...) syntax.
+Module.prototype.dynamicImport = function (id) {
+  var module = this;
+  return module.prefetch(id).then(function () {
+    return getNamespace(module, id);
+  });
+};
+
+// Called by Module.prototype.prefetch if there are any missing dynamic
+// modules that need to be fetched.
+meteorInstall.fetch = function (ids) {
+  var tree = Object.create(null);
+  var versions = Object.create(null);
+  var dynamicVersions = require("./dynamic-versions.js");
+  var missing;
+
+  function addSource(id, source) {
+    addToTree(tree, id, makeModuleFunction(id, source, ids[id].options));
+  }
+
+  function addMissing(id) {
+    addToTree(missing = missing || Object.create(null), id, 1);
+  }
+
+  Object.keys(ids).forEach(function (id) {
+    var version = dynamicVersions.get(id);
+    if (version) {
+      versions[id] = version;
+    } else {
+      addMissing(id);
+    }
+  });
+
+  return cache.checkMany(versions).then(function (sources) {
+    Object.keys(sources).forEach(function (id) {
+      var source = sources[id];
+      if (source) {
+        addSource(id, source);
+      } else {
+        addMissing(id);
+      }
+    });
+
+    return missing && fetchMissing(missing).then(function (results) {
+      var versionsAndSourcesById = Object.create(null);
+      var flatResults = flattenModuleTree(results);
+
+      Object.keys(flatResults).forEach(function (id) {
+        var source = flatResults[id];
+        addSource(id, source);
+
+        var version = dynamicVersions.get(id);
+        if (version) {
+          versionsAndSourcesById[id] = {
+            version: version,
+            source: source
+          };
+        }
+      });
+
+      cache.setMany(versionsAndSourcesById);
+    });
+
+  }).then(function () {
+    return tree;
+  });
+};
+
+function flattenModuleTree(tree) {
+  var parts = [""];
+  var result = Object.create(null);
+
+  function walk(t) {
+    if (t && typeof t === "object") {
+      Object.keys(t).forEach(function (key) {
+        parts.push(key);
+        walk(t[key]);
+        parts.pop();
+      });
+    } else if (typeof t === "string") {
+      result[parts.join("/")] = t;
+    }
+  }
+
+  walk(tree);
+
+  return result;
+}
+
+function makeModuleFunction(id, source, options) {
+  // By calling (options && options.eval || eval) in a wrapper function,
+  // we delay the cost of parsing and evaluating the module code until the
+  // module is first imported.
+  return function () {
+    // If an options.eval function was provided in the second argument to
+    // meteorInstall when this bundle was first installed, use that
+    // function to parse and evaluate the dynamic module code in the scope
+    // of the package. Otherwise fall back to indirect (global) eval.
+    return (options && options.eval || eval)(
+      // Wrap the function(require,exports,module){...} expression in
+      // parentheses to force it to be parsed as an expression.
+      "(" + source + ")\n//# sourceURL=" + id
+    ).apply(this, arguments);
+  };
+}
+
+var secretKey = null;
+exports.setSecretKey = function (key) {
+  secretKey = key;
+};
+
+var fetchURL = require("./common.js").fetchURL;
+
+function fetchMissing(missingTree) {
+  // If the hostname of the URL returned by Meteor.absoluteUrl differs
+  // from location.host, then we'll be making a cross-origin request here,
+  // but that's fine because the dynamic-import server sets appropriate
+  // CORS headers to enable fetching dynamic modules from any
+  // origin. Browsers that check CORS do so by sending an additional
+  // preflight OPTIONS request, which may add latency to the first dynamic
+  // import() request, so it's a good idea for ROOT_URL to match
+  // location.host if possible, though not strictly necessary.
+  var url = Meteor.absoluteUrl(fetchURL);
+
+  if (secretKey) {
+    url += "key=" + secretKey;
+  }
+
+  return fetch(url, {
+    method: "POST",
+    body: JSON.stringify(missingTree)
+  }).then(function (res) {
+    if (! res.ok) throw res;
+    return res.json();
+  });
+}
+
+function addToTree(tree, id, value) {
+  var parts = id.split("/");
+  var lastIndex = parts.length - 1;
+  parts.forEach(function (part, i) {
+    if (part) {
+      tree = tree[part] = tree[part] ||
+        (i < lastIndex ? Object.create(null) : value);
+    }
+  });
+}
+
+function getNamespace(module, id) {
+  var namespace;
+
+  module.link(id, {
+    "*": function (ns) {
+      namespace = ns;
+    }
+  });
+
+  // This helps with Babel interop, since we're not just returning the
+  // module.exports object.
+  Object.defineProperty(namespace, "__esModule", {
+    value: true,
+    enumerable: false
+  });
+
+  return namespace;
+}
+
 /////////////////////////////////////////////////////////////////////////////////
 
 },"cache.js":function(require,exports,module){
@@ -198,196 +210,207 @@ function getNamespace(module, id) {                                            /
 //                                                                             //
 /////////////////////////////////////////////////////////////////////////////////
                                                                                //
-var hasOwn = Object.prototype.hasOwnProperty;                                  // 1
-var dbPromise;                                                                 // 2
-                                                                               // 3
-var canUseCache =                                                              // 4
-  // The server doesn't benefit from dynamic module fetching, and almost       // 5
-  // certainly doesn't support IndexedDB.                                      // 6
-  Meteor.isClient &&                                                           // 7
-  // Cordova bundles all modules into the monolithic initial bundle, so        // 8
-  // the dynamic module cache won't be necessary.                              // 9
-  ! Meteor.isCordova &&                                                        // 10
-  // Caching can be confusing in development, and is designed to be a          // 11
-  // transparent optimization for production performance.                      // 12
-  Meteor.isProduction;                                                         // 13
-                                                                               // 14
-function getIDB() {                                                            // 15
-  if (typeof indexedDB !== "undefined") return indexedDB;                      // 16
-  if (typeof webkitIndexedDB !== "undefined") return webkitIndexedDB;          // 17
-  if (typeof mozIndexedDB !== "undefined") return mozIndexedDB;                // 18
-  if (typeof OIndexedDB !== "undefined") return OIndexedDB;                    // 19
-  if (typeof msIndexedDB !== "undefined") return msIndexedDB;                  // 20
-}                                                                              // 21
-                                                                               // 22
-function withDB(callback) {                                                    // 23
-  dbPromise = dbPromise || new Promise(function (resolve, reject) {            // 24
-    var idb = getIDB();                                                        // 25
-    if (! idb) {                                                               // 26
-      throw new Error("IndexedDB not available");                              // 27
-    }                                                                          // 28
-                                                                               // 29
-    // Incrementing the version number causes all existing object stores       // 30
-    // to be deleted and recreates those specified by objectStoreMap.          // 31
-    var request = idb.open("MeteorDynamicImportCache", 2);                     // 32
-                                                                               // 33
-    request.onupgradeneeded = function (event) {                               // 34
-      var db = event.target.result;                                            // 35
-                                                                               // 36
-      // It's fine to delete existing object stores since onupgradeneeded      // 37
-      // is only called when we change the DB version number, and the data     // 38
-      // we're storing is disposable/reconstructible.                          // 39
-      Array.from(db.objectStoreNames).forEach(db.deleteObjectStore, db);       // 40
-                                                                               // 41
-      Object.keys(objectStoreMap).forEach(function (name) {                    // 42
-        db.createObjectStore(name, objectStoreMap[name]);                      // 43
-      });                                                                      // 44
-    };                                                                         // 45
-                                                                               // 46
-    request.onerror = makeOnError(reject, "indexedDB.open");                   // 47
-    request.onsuccess = function (event) {                                     // 48
-      resolve(event.target.result);                                            // 49
-    };                                                                         // 50
-  });                                                                          // 51
-                                                                               // 52
-  return dbPromise.then(callback, function (error) {                           // 53
-    return callback(null);                                                     // 54
-  });                                                                          // 55
-}                                                                              // 56
-                                                                               // 57
-var objectStoreMap = {                                                         // 58
-  sourcesByVersion: { keyPath: "version" }                                     // 59
-};                                                                             // 60
-                                                                               // 61
-function makeOnError(reject, source) {                                         // 62
-  return function (event) {                                                    // 63
-    reject(new Error(                                                          // 64
-      "IndexedDB failure in " + source + " " +                                 // 65
-        JSON.stringify(event.target)                                           // 66
-    ));                                                                        // 67
-                                                                               // 68
-    // Returning true from an onerror callback function prevents an            // 69
-    // InvalidStateError in Firefox during Private Browsing. Silencing         // 70
-    // that error is safe because we handle the error more gracefully by       // 71
-    // passing it to the Promise reject function above.                        // 72
-    // https://github.com/meteor/meteor/issues/8697                            // 73
-    return true;                                                               // 74
-  };                                                                           // 75
-}                                                                              // 76
-                                                                               // 77
-var checkCount = 0;                                                            // 78
-                                                                               // 79
-exports.checkMany = function (versions) {                                      // 80
-  var ids = Object.keys(versions);                                             // 81
-  var sourcesById = Object.create(null);                                       // 82
-                                                                               // 83
-  // Initialize sourcesById with null values to indicate all sources are       // 84
-  // missing (unless replaced with actual sources below).                      // 85
-  ids.forEach(function (id) {                                                  // 86
-    sourcesById[id] = null;                                                    // 87
-  });                                                                          // 88
-                                                                               // 89
-  if (! canUseCache) {                                                         // 90
-    return Promise.resolve(sourcesById);                                       // 91
-  }                                                                            // 92
-                                                                               // 93
-  return withDB(function (db) {                                                // 94
-    if (! db) {                                                                // 95
-      // We thought we could used IndexedDB, but something went wrong          // 96
-      // while opening the database, so err on the side of safety.             // 97
-      return sourcesById;                                                      // 98
-    }                                                                          // 99
-                                                                               // 100
-    var txn = db.transaction([                                                 // 101
-      "sourcesByVersion"                                                       // 102
-    ], "readonly");                                                            // 103
-                                                                               // 104
-    var sourcesByVersion = txn.objectStore("sourcesByVersion");                // 105
-                                                                               // 106
-    ++checkCount;                                                              // 107
-                                                                               // 108
-    function finish() {                                                        // 109
-      --checkCount;                                                            // 110
-      return sourcesById;                                                      // 111
-    }                                                                          // 112
-                                                                               // 113
-    return Promise.all(ids.map(function (id) {                                 // 114
-      return new Promise(function (resolve, reject) {                          // 115
-        var version = versions[id];                                            // 116
-        if (version) {                                                         // 117
-          var sourceRequest = sourcesByVersion.get(versions[id]);              // 118
+var dbPromise;
+
+var canUseCache =
+  // The server doesn't benefit from dynamic module fetching, and almost
+  // certainly doesn't support IndexedDB.
+  Meteor.isClient &&
+  // Cordova bundles all modules into the monolithic initial bundle, so
+  // the dynamic module cache won't be necessary.
+  ! Meteor.isCordova &&
+  // Caching can be confusing in development, and is designed to be a
+  // transparent optimization for production performance.
+  Meteor.isProduction;
+
+function getIDB() {
+  if (typeof indexedDB !== "undefined") return indexedDB;
+  if (typeof webkitIndexedDB !== "undefined") return webkitIndexedDB;
+  if (typeof mozIndexedDB !== "undefined") return mozIndexedDB;
+  if (typeof OIndexedDB !== "undefined") return OIndexedDB;
+  if (typeof msIndexedDB !== "undefined") return msIndexedDB;
+}
+
+function withDB(callback) {
+  dbPromise = dbPromise || new Promise(function (resolve, reject) {
+    var idb = getIDB();
+    if (! idb) {
+      throw new Error("IndexedDB not available");
+    }
+
+    // Incrementing the version number causes all existing object stores
+    // to be deleted and recreates those specified by objectStoreMap.
+    var request = idb.open("MeteorDynamicImportCache", 2);
+
+    request.onupgradeneeded = function (event) {
+      var db = event.target.result;
+
+      // It's fine to delete existing object stores since onupgradeneeded
+      // is only called when we change the DB version number, and the data
+      // we're storing is disposable/reconstructible.
+      Array.from(db.objectStoreNames).forEach(db.deleteObjectStore, db);
+
+      Object.keys(objectStoreMap).forEach(function (name) {
+        db.createObjectStore(name, objectStoreMap[name]);
+      });
+    };
+
+    request.onerror = makeOnError(reject, "indexedDB.open");
+    request.onsuccess = function (event) {
+      resolve(event.target.result);
+    };
+  });
+
+  return dbPromise.then(callback, function (error) {
+    return callback(null);
+  });
+}
+
+var objectStoreMap = {
+  sourcesByVersion: { keyPath: "version" }
+};
+
+function makeOnError(reject, source) {
+  return function (event) {
+    reject(new Error(
+      "IndexedDB failure in " + source + " " +
+        JSON.stringify(event.target)
+    ));
+
+    // Returning true from an onerror callback function prevents an
+    // InvalidStateError in Firefox during Private Browsing. Silencing
+    // that error is safe because we handle the error more gracefully by
+    // passing it to the Promise reject function above.
+    // https://github.com/meteor/meteor/issues/8697
+    return true;
+  };
+}
+
+var checkCount = 0;
+
+exports.checkMany = function (versions) {
+  var ids = Object.keys(versions);
+  var sourcesById = Object.create(null);
+
+  // Initialize sourcesById with null values to indicate all sources are
+  // missing (unless replaced with actual sources below).
+  ids.forEach(function (id) {
+    sourcesById[id] = null;
+  });
+
+  if (! canUseCache) {
+    return Promise.resolve(sourcesById);
+  }
+
+  return withDB(function (db) {
+    if (! db) {
+      // We thought we could used IndexedDB, but something went wrong
+      // while opening the database, so err on the side of safety.
+      return sourcesById;
+    }
+
+    var txn = db.transaction([
+      "sourcesByVersion"
+    ], "readonly");
+
+    var sourcesByVersion = txn.objectStore("sourcesByVersion");
+
+    ++checkCount;
+
+    function finish() {
+      --checkCount;
+      return sourcesById;
+    }
+
+    return Promise.all(ids.map(function (id) {
+      return new Promise(function (resolve, reject) {
+        var version = versions[id];
+        if (version) {
+          var sourceRequest = sourcesByVersion.get(version);
           sourceRequest.onerror = makeOnError(reject, "sourcesByVersion.get");
-          sourceRequest.onsuccess = function (event) {                         // 120
-            var result = event.target.result;                                  // 121
-            if (result) {                                                      // 122
-              sourcesById[id] = result.source;                                 // 123
-            }                                                                  // 124
-            resolve();                                                         // 125
-          };                                                                   // 126
-        } else resolve();                                                      // 127
-      });                                                                      // 128
-    })).then(finish, finish);                                                  // 129
-  });                                                                          // 130
-};                                                                             // 131
-                                                                               // 132
-var pendingVersionsAndSourcesById = Object.create(null);                       // 133
-                                                                               // 134
-exports.setMany = function (versionsAndSourcesById) {                          // 135
-  if (canUseCache) {                                                           // 136
-    Object.assign(                                                             // 137
-      pendingVersionsAndSourcesById,                                           // 138
-      versionsAndSourcesById                                                   // 139
-    );                                                                         // 140
-                                                                               // 141
-    // Delay the call to flushSetMany so that it doesn't contribute to the     // 142
-    // amount of time it takes to call module.dynamicImport.                   // 143
-    if (! flushSetMany.timer) {                                                // 144
-      flushSetMany.timer = setTimeout(flushSetMany, 100);                      // 145
-    }                                                                          // 146
-  }                                                                            // 147
-};                                                                             // 148
-                                                                               // 149
-function flushSetMany() {                                                      // 150
-  if (checkCount > 0) {                                                        // 151
-    // If checkMany is currently underway, postpone the flush until later,     // 152
-    // since updating the cache is less important than reading from it.        // 153
-    return flushSetMany.timer = setTimeout(flushSetMany, 100);                 // 154
-  }                                                                            // 155
-                                                                               // 156
-  flushSetMany.timer = null;                                                   // 157
-                                                                               // 158
-  var versionsAndSourcesById = pendingVersionsAndSourcesById;                  // 159
-  pendingVersionsAndSourcesById = Object.create(null);                         // 160
-                                                                               // 161
-  return withDB(function (db) {                                                // 162
-    if (! db) {                                                                // 163
-      // We thought we could used IndexedDB, but something went wrong          // 164
-      // while opening the database, so err on the side of safety.             // 165
-      return;                                                                  // 166
-    }                                                                          // 167
-                                                                               // 168
-    var setTxn = db.transaction([                                              // 169
-      "sourcesByVersion"                                                       // 170
-    ], "readwrite");                                                           // 171
-                                                                               // 172
-    var sourcesByVersion = setTxn.objectStore("sourcesByVersion");             // 173
-                                                                               // 174
-    return Promise.all(                                                        // 175
-      Object.keys(versionsAndSourcesById).map(function (id) {                  // 176
-        var info = versionsAndSourcesById[id];                                 // 177
-        return new Promise(function (resolve, reject) {                        // 178
-          var request = sourcesByVersion.put({                                 // 179
-            version: info.version,                                             // 180
-            source: info.source                                                // 181
-          });                                                                  // 182
-          request.onerror = makeOnError(reject, "sourcesByVersion.put");       // 183
-          request.onsuccess = resolve;                                         // 184
-        });                                                                    // 185
-      })                                                                       // 186
-    );                                                                         // 187
-  });                                                                          // 188
-}                                                                              // 189
-                                                                               // 190
+          sourceRequest.onsuccess = function (event) {
+            var result = event.target.result;
+            if (result) {
+              sourcesById[id] = result.source;
+            }
+            resolve();
+          };
+        } else resolve();
+      });
+    })).then(finish, finish);
+  });
+};
+
+var pendingVersionsAndSourcesById = Object.create(null);
+
+exports.setMany = function (versionsAndSourcesById) {
+  if (canUseCache) {
+    Object.assign(
+      pendingVersionsAndSourcesById,
+      versionsAndSourcesById
+    );
+
+    // Delay the call to flushSetMany so that it doesn't contribute to the
+    // amount of time it takes to call module.dynamicImport.
+    if (! flushSetMany.timer) {
+      flushSetMany.timer = setTimeout(flushSetMany, 100);
+    }
+  }
+};
+
+function flushSetMany() {
+  if (checkCount > 0) {
+    // If checkMany is currently underway, postpone the flush until later,
+    // since updating the cache is less important than reading from it.
+    return flushSetMany.timer = setTimeout(flushSetMany, 100);
+  }
+
+  flushSetMany.timer = null;
+
+  var versionsAndSourcesById = pendingVersionsAndSourcesById;
+  pendingVersionsAndSourcesById = Object.create(null);
+
+  return withDB(function (db) {
+    if (! db) {
+      // We thought we could used IndexedDB, but something went wrong
+      // while opening the database, so err on the side of safety.
+      return;
+    }
+
+    var setTxn = db.transaction([
+      "sourcesByVersion"
+    ], "readwrite");
+
+    var sourcesByVersion = setTxn.objectStore("sourcesByVersion");
+
+    return Promise.all(
+      Object.keys(versionsAndSourcesById).map(function (id) {
+        var info = versionsAndSourcesById[id];
+        return new Promise(function (resolve, reject) {
+          var request = sourcesByVersion.put({
+            version: info.version,
+            source: info.source
+          });
+          request.onerror = makeOnError(reject, "sourcesByVersion.put");
+          request.onsuccess = resolve;
+        });
+      })
+    );
+  });
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+},"common.js":function(require,exports){
+
+/////////////////////////////////////////////////////////////////////////////////
+//                                                                             //
+// packages/dynamic-import/common.js                                           //
+//                                                                             //
+/////////////////////////////////////////////////////////////////////////////////
+                                                                               //
+exports.fetchURL = "/__meteor__/dynamic-import/fetch";
+
 /////////////////////////////////////////////////////////////////////////////////
 
 },"dynamic-versions.js":function(require,exports,module){
@@ -398,11 +421,95 @@ function flushSetMany() {                                                      /
 //                                                                             //
 /////////////////////////////////////////////////////////////////////////////////
                                                                                //
-// This magic double-underscored identifier gets replaced in                   // 1
-// tools/isobuild/bundler.js with a tree of hashes of all dynamic              // 2
-// modules, for use in client.js and cache.js.                                 // 3
-module.exports = {"node_modules":{"react-dates":{"lib":{"css":{"_datepicker.css":"576a0a768086f8ab5364cb13e8a325d725853e37"},"components":{"DateRangePicker.js":"65e8e5cd6b02be8c1c4e91b1188f421f08c23438","OutsideClickHandler.js":"a5dca674bb06784102a656fc5fad22748e88b829","DateRangePickerInputController.js":"00c01e7f9d3ea7e5e6abdf88bc0f62033c923995","DateRangePickerInput.js":"3a269a1b1b80c7abdce7722d578d50041df39d03","DateInput.js":"91792113219129373ab17e1c71ed38155a9853e3","DayPickerRangeController.js":"9465a533d67d4bd50f1216bdef35b05b0947b769","DayPicker.js":"486407d5de229c8dc6a418171c5e88f755e25771","CalendarMonthGrid.js":"409cfc55b29fa3e3cc6bdafdd06857ac5876e3ca","CalendarMonth.js":"5deabea6b78059799b2175745a55ea1d8518ba2e","CalendarDay.js":"a9effd16d3db0cdeb530d81f4ebfba1ba5b91616","DayPickerKeyboardShortcuts.js":"b24c9a920ea2118fc0eda9cb34605b1dc8b6e894","DayPickerNavigation.js":"2a65a722ec6a82ff50fcaa21bf7c602d46a301c7","SingleDatePicker.js":"c977bcb713e7d544a7bf4c5c945e4fb02c817b59","DayPickerSingleDateController.js":"94644c0fab446810679ad6991983261ce4e6088b","SingleDatePickerInput.js":"2ebaf49d8679f83a6aea8742da0323364d924878"},"defaultPhrases.js":"b8c045c26bbcbe223fec6b18d152656093ac41b4","utils":{"isInclusivelyAfterDay.js":"b93d74b3435f306b4df5975495ecd06c93c95ec0","isBeforeDay.js":"b2e5b9f4cba12c9cb727417bdfb8647ae523bd56","getResponsiveContainerStyles.js":"2585650397d7966a722bc7d4249a2768a67e7b5f","getPhrasePropTypes.js":"b4c884a4715f35e0b9ca090cdc27e8165562f143","toISODateString.js":"08b28a591d1088358251d9dd7911d5378c5501e1","toMomentObject.js":"58aef3782a42a9ff5d4c1bcaf0fe4468ec0741d2","toLocalizedDateString.js":"acb3358d6312bad3d4003d9b9f08f145ba61d4cd","isAfterDay.js":"36bd5ea2cfab77d9ffae832f839514bf5ecdb600","isSameDay.js":"1eb5a3488c661f7dfe4212a850ad6c9c04babee1","isDayVisible.js":"6b6d3ad262f59c5da2944a1764dd35c80219e6d2","toISOMonthString.js":"fc23ba5ef1d74710def353cdf49d5b03caa705f5","getVisibleDays.js":"f1b38390339695cd867bbc77fbe580d5513f9095","getCalendarMonthWidth.js":"0b53c7de8681b45444bc1edccc5a5e27e0db15fe","getTransformStyles.js":"b8e7c4925dbe3872f8c373faa798885d8422c90d","getActiveElement.js":"7ab67d7fc03d17ef045d56f3fe1ceeefcbad00b8","isTransitionEndSupported.js":"cf894bb565a0325a59b087ba98c765aac3711ce3","getCalendarMonthWeeks.js":"b02630b665f2aa365e5c076db69d2dd8a8e87174","getPhrase.js":"5667098cf30a58ee90df5c45f17b4787f74a02e9","isNextDay.js":"29de31920378c82a9a456d035aa39bd9f7e1d504","isInclusivelyBeforeDay.js":"77f9565ca4101ecc29e2962dfe111c04c2c59d14"},"shapes":{"DateRangePickerShape.js":"b0ead7e77b05bc9c55d13bf59bc00d2719d5a148","FocusedInputShape.js":"94e246277e319e3efc74caca3f4a93afe0041fcb","IconPositionShape.js":"0e4597cd0a38b1dadc41fdbc8cbe4572fe827c3d","OrientationShape.js":"0ff095d3e84a04b65a51c85ace536057f22d3d29","AnchorDirectionShape.js":"8cb0fb0f9d01a2ead3c62106779058016c0e4ea8","OpenDirectionShape.js":"065990f210be73cc0e610f5049cc2056ec9808ea","DayOfWeekShape.js":"1a54f8cbcab9fd06932cc3c8336d7bb242289eb3","ScrollableOrientationShape.js":"be0e985c678465c1c9ddf6213c2d1b55f58eb554","SingleDatePickerShape.js":"8c539d511c57462e19fc9623019eda0524bf1fb5"}},"package.json":"0d49497dbe802ccb353efa56202c05f89cadea37","index.js":"b4442de92720a0c5e491cc7dfcd99426de076c70","constants.js":"27ee7092820955de339f443d2193c4e69641dfe0"},"airbnb-prop-types":{"package.json":"6ba30dfd6ec37eb0ed08f623127ea4ea70b5e116","index.js":"8b5472ea13487e3b475b5d114dcdede2790ac56f","build":{"mocks":{"index.js":"6f5fb1c346da6eeec3f315b37a25ec2e91f4cb85"},"index.js":"6d52ab1347928ceb196092f34e4926f6812987d6","and.js":"6c7570a372519ea227a3d6c90e13e5a29dd14e7a","helpers":{"wrapValidator.js":"f310b7b861159f33f9382da42564d127c9a322da","isPlainObject.js":"2cf2bba82e2df23326f8779597808415260dab24","isPrimitive.js":"9e6cd5a8316d3fbeeccbecd8027e252700f6a3ab","renderableChildren.js":"609dd01a669765302227ecf2165fc817f09f894f","getComponentName.js":"2298b3143d3b0873891318968661df1d5b348e62","isInteger.js":"ec067a5baccebe28c8aa730a99d783a1624a0180","typeOf.js":"c105d1cf584012b09191c95efa4c03f6e94a54dc"},"between.js":"f95d56ae03fe755143737c745712b325ade2ae8e","shape.js":"2e4c4070e7c5ebf64d937dee5aa8388beb98f096","valuesOf.js":"9c8c647e7980cd748234e4abd90d43156ee7e2f3","booleanSome.js":"3d597a4a717258625f4ebc3c94c2e49f4a3c1ca4","childrenHavePropXorChildren.js":"396769f4d2c785c17a71eb20ab10c24810f473db","childrenOf.js":"0c7a7b18b9fa1c813d374af5690387f85f70137d","childrenOfType.js":"3b81541516891ad0b81fab49944ba86a6c1800fb","childrenSequenceOf.js":"5199f60c3be0a1f5ef2d5003390b23165b0eb466","sequenceOf.js":"1253ad47f513aae60d0e92b3ae6878aeea98dbc6","nonNegativeInteger.js":"fdf0db15e4c4ebf5881ddc724c73d18d58054bbb","integer.js":"e900b94767533c41059c5aa339be1f053042bd18","nonNegativeNumber.js":"71ff69ed5e7dae6365f61437e528c6eee52b4dc9","object.js":"59976ba5de15baa8f715e09e8e6d5b3a77ef29c3","withShape.js":"407d933610f0ac66e92c874b250d39e6be2e53ee","componentWithName.js":"c7a1010c66ff12be1104e0ead2379b378677f338","disallowedIf.js":"0d96d954434c3982421d5c3722caa683fe236139","elementType.js":"b3f4362b4409706f694cb55b2abf452f0ced625c","empty.js":"18436d0f5f2451a59525ab925ac06adf270823e9","or.js":"4c9bb7a42dc9b2251bbc285d3acc5677c1a8bb60","explicitNull.js":"c07d2c165e0ee2e532f23d615124f95437718fed","keysOf.js":"9ff9c750c4b15b7a131dcdae984243bf90938e7f","mutuallyExclusiveProps.js":"dc2d6fa8f5bac94720528c234718af34186fb741","mutuallyExclusiveTrueProps.js":"61e90e8311c656471ff3807391a4921134ecb2c6","nChildren.js":"4bd921c256e12da60f59c85ba5621cff053d0075","numericString.js":"9430dd6a0702a218290ed9c37399e2e4731b0619","range.js":"dd67eae67bb6f4ae9e6aae998c1ce080545aba12","ref.js":"3a1e2a236133336548628cec0387f133e856bef2","requiredBy.js":"2a693c1989499d20db5cd40bec0a1c52c60b2b36","restrictedProp.js":"07a41b1850ff0a0629897ef47ebeebfd411e4574","stringEndsWith.js":"5eb479ddf7dc7111b4d8d65bdbdb6f37345e0aba","stringStartsWith.js":"27f21bfd4fcf4b299c4455d43bcb6c9796bec8d2","uniqueArray.js":"ccf69eb4e4afd39f0820bf356fae34dfd2338f90","uniqueArrayOf.js":"b58bd4e99ed5e899b753f63c36f5a663a14b161a"}},"prop-types-exact":{"package.json":"b7613f6a790eff299069f103b788a7cc045f28b8","build":{"index.js":"e13817bf9763b43dca130076e9986bb04793bfe0","helpers":{"isPlainObject.js":"0b3ba074e8805a410091fb560ace4d718576d049"}}},"object.assign":{"package.json":"343c4146b27a3ed608a5777438c36605ea47008c","index.js":"e61516cd24c67c81ec21b7051a8d3ffd20c22ddc","implementation.js":"74fcf35c3f5ef5dbdb58c35508ea35302d9967cb","polyfill.js":"965d93acc46225e575e555d8ac4e24bc49f373e3","shim.js":"601e0e8aad5caaf79192cfe1e337260f334dbd35"},"define-properties":{"package.json":"379cd44d1feb22bc8712ac56fcb774addc3c466a","index.js":"5ec95f1ee41e4cac25c051a05fa84a006f6aec67"},"object-keys":{"package.json":"0cfd6f03a6d14f096f6d9b147ab1810da4275be0","index.js":"6ee11573992004c2de52cf0abe8153afc98d1b87","isArguments.js":"d44b4bae3380a4f63f1d76a19b9afde637e1086f","implementation.js":"2cbce305d52fd995a49831f85d0fc21c068789da"},"function-bind":{"package.json":"5577817cc4cd3288c4fe1a1d3b8bb0f41581dfe1","index.js":"e193c9aefb04a67e796e562ea64c8fabc40f050f","implementation.js":"d8ce3be760faae160fc7e2c7cb6c06203781813d"},"has-symbols":{"shams.js":"8e85bb441b14d449ef6c45126330a87cd1b9c16c","package.json":"ab1d06571e07f7eca58da393d40e900f80687d4b","index.js":"9b469339ca852295d885c1dd8e68fa67e61427dc"},"has":{"package.json":"715edcd9f9349072f349eea0fa45c45e052de1f1","src":{"index.js":"bbd5e0eb2498b15a0543f1690fd348d3b4331024"}},"object.entries":{"package.json":"1b2488d52a3860dccdd5812b8031ba05e4444b3f","index.js":"fc1e3bb25eea6d15c6ad0f5e04e6ad0392244447","implementation.js":"360ca2f1d5deaaee0ddc25ad61f4de50fefe5f84","polyfill.js":"b2fbc4f8d46073df3d832145050be505861c2a53","shim.js":"31c6729920ecf6c08bf70cf5e5499d3ba5251008"},"es-abstract":{"es7.js":"98045ffc8f6839fa4dad87da49274fff1fe0d5c0","es2016.js":"601dc1b22cc74caf5ee02d7d5f3d5e43c381eb25","GetIntrinsic.js":"36aa4b27d2c1a81da55e3f2fd4cb0dffd0a5e2e6","es2015.js":"91772a3a96243fd25ac704fa5f3081180f1af7a7","helpers":{"assertRecord.js":"4f5113164ba509d50df7db588fb4e17bce6ecbb9","isNaN.js":"0a062df40bde3d4f4afb8b911689428706096225","isFinite.js":"decac7b4f0cfcc6ea70414c3b9fb3defaad52511","assign.js":"a5fe5368be2e4c7777913d46bb530d4ee8479330","sign.js":"7af5f35c52b2c9e12e300a8685c0fafd94868b38","mod.js":"f89a63c38d7418cc69d8904321618f5be80cf128","isPrimitive.js":"8df0bc55972ef267782a26302aec79441859dff1","forEach.js":"ef31d7fe22de6e704d72dc0f259fd86f144fa8c4","every.js":"a3ee984015a7d3ff67dde520200712c4494f3fd6","isSamePropertyDescriptor.js":"e170f7fa6e269ed47b87ba4066f59dc04762d277","isPropertyDescriptor.js":"a550210dc1dcab32ce3dfea9dd1dc01bf2cc6120","callBind.js":"a64d19ce9f0ee5e667dc3fe58b41e9683abca4a7"},"es5.js":"f7df95860c052d611c1eab302beb70674537148f","es6.js":"712599df089bcb04dba4b55dc8c6d9bb8f700af0"},"es-to-primitive":{"es6.js":"33496e09abff2c56d46cbc868dc6bad7be133cbc","es2015.js":"e0e9f29709170d0a8b6df16be7b8bf4625173a0f","helpers":{"isPrimitive.js":"b0d29c13ce9e897a98d74140c96c4cc75cfb417d"},"es5.js":"fa0b5ecd493c3b9800f41aec95e42fbbdb4c14b8"},"is-callable":{"package.json":"066777838f7e0d6bfd4fc4f1a621d757d706cced","index.js":"a8ea1ffea7dd5829f74f147453eb64681ecb0ffa"},"is-date-object":{"package.json":"c92b6ccbe8cd1bafbdb5802eed548bef818f238b","index.js":"af9e9c8688cc810dbabf2b7df32e9e79902414d3"},"is-symbol":{"package.json":"7c625095224526361b4f3e149a4cccef43be0519","index.js":"fe7732dc6ee64c3d7b5e9d0321ff2d357dbcda5b"},"object-inspect":{"package.json":"0d8877ef1241955a93fe590c532e2ebac3450aa2","index.js":"4b886d425762655e334c015e867c021e42ceb4d0","util.inspect.js":"1d675af2cc7c3d2379fb2ec290d9276ff71b4b4a"},"meteor-node-stubs":{"deps":{"util.js":"3c5c166f18ccf61b957b62055dad58c12bdef9f2"},"node_modules":{"util":{"util.js":"481fad0ae554e4d662fe083861f6a2ba055dbbf0","support":{"isBuffer.js":"39069cf7f00558ea4098990106b7fcb5cd84617c"}},"inherits":{"package.json":"2107ab98659251d5608a760c519350258ccd3686","inherits_browser.js":"e5b4c72e0130491648afefe87a4ca6572bbc6fb0"}}},"is-regex":{"package.json":"b9651b96bc917aa0aa411c08abf9058c50e9e720","index.js":"e1636d7c48ed57af7c51a92867ec686b9ed1646c"},"array.prototype.find":{"package.json":"dac1ed4766e6ca4476fb50e76c6e56ddc1b5cd10","index.js":"2c428dc3f28fc4ec6614849e2c00bddd41b2ee15","implementation.js":"c74fa0562603ecacb025f50d11600b5421986438","polyfill.js":"467c91cd80123b3addf9ca0a8d1758f6b4878ce1","shim.js":"4fb5dba7156264a2e6bfed9a2129bd9a5efa150f"},"function.prototype.name":{"package.json":"26ef23ee400eee51eda3e7f69be63271da7bd2a7","index.js":"06e5c4495936bdab194fe3e885407a5b67eb701f","implementation.js":"d99c1c40a762151c9634b131168665b4ac513449","polyfill.js":"fa39432ce27a9ce3e3579e41707a8f6379410e70","shim.js":"29937e1f8a4265ddedd3fe463388bd7d24547493"},"functions-have-names":{"package.json":"0b09159b8397772953b9e911c2fa31318f91d3e5","index.js":"193ca6cdd2ece95ce317a16a2a304cb3049b4bbe"},"object-is":{"package.json":"6127349aa7e4651399c9c258245228008a95ac69","index.js":"be68276ed2fbbc930f2c041c81e35adadd9b0b21"},"is-touch-device":{"package.json":"8d22e93b4afe5cbbc7c1b91ffeadd03949b7eeb5","build":{"index.js":"339ec2033501bd2ae9c913863883981e677aa35b"}},"react-addons-shallow-compare":{"package.json":"c00d8edb2cbed8cdad206ed3cb5edcf349e7a5ff","index.js":"93883af276ff112b53a65810efce6017768d3dc1"},"consolidated-events":{"package.json":"b69083fe11b93de068fbb61942b7838f478405d1","lib":{"index.js":"f844290c65a34cd3940aa5a509e2a654b377b07c","normalizeEventOptions.js":"f090599757b1cbfff4dc18c8c67fc7c9e7af632d","canUsePassiveEventListeners.js":"04710954522cea29199f33b946cf4310afc523c6","canUseDOM.js":"2aa06b507cc916481ce21ca8cd52f57875269e1e","TargetEventHandlers.js":"9de6e60afb56b94ac98b9f8911c6cfddb597a937","eventOptionsKey.js":"245bc4c7fcc4f57d3ff1864e00251a89d74be8bc"}},"react-portal":{"package.json":"ca133fb13335954b7902efa9aba145e8474c50f8","build":{"portal.js":"97512dc44c8c94d65a39dcac7cb942f7c028f4bc"}},"react-moment-proptypes":{"package.json":"c1ce9bfb053cbd5f900472a0d20d873b301f57e9","src":{"index.js":"3ed8a28304db46f32db7a8e1741b9a48308d4bd6","moment-validation-wrapper.js":"2d49372e1b78d5a6cc2dec92d39687fb9775ee70","core.js":"fe65e904e397429d3a0acf075732c180009e1075"}},"lodash":{"throttle.js":"6e5e802b73704d7d0cd9e0c9321c33bd1d3efe73","debounce.js":"ead9ee1589184e874cbbdccfbccdbd45a47f82f3","isObject.js":"a0f8cce6462396fc4f6fe1632043ea628ee750bd","now.js":"a2ae104a1baba22e6a003ce8587b798bda7ac715","_root.js":"6f46f2bc1ef89018ece4f2f87b49b7a41223e1ee","_freeGlobal.js":"0aab44367eb8585e5a0d9ac736323425db22b307","toNumber.js":"a80091aa91dbeb1f16730367773598fa4ad32cf2","isSymbol.js":"dedcb63ba47868283ad7a3776b88555c29d86424","_baseGetTag.js":"d29c101395eb13722b8b073f2105776482ccda5f","_Symbol.js":"2ed647053097eb07ea641275dec6ab6c1afd6f65","_getRawTag.js":"ee4e1054d5b48b970f98a2c36778477d3af887be","_objectToString.js":"96e66db116fc6ea670dbcd15a0cc14fabce1f7e0","isObjectLike.js":"2b1e74d529e9bcb509e63aabc59a5228630013e8"},"object.values":{"package.json":"78105aff264e86dc8befec74350172be50c723ff","index.js":"34b37f64c6a5621d6eb68740b3684b82d1bf8b65","implementation.js":"b463cbf963a070095712b7cdb0cb9f326836427b","polyfill.js":"d5b2121c90d95438d2662d472e22f10c7aeda8e9","shim.js":"a0dac16bd38873e9c2954a3e4263ebfc57c6dfa1"}},"imports":{"ui":{"components":{"PickDates.js":"a085e8e4f8d7ff31014c2b498c6f22ed6be335a2"}}}};                                         // 4
-                                                                               // 5
+// This magic double-underscored identifier gets replaced in
+// tools/isobuild/bundler.js with a tree of hashes of all dynamic
+// modules, for use in client.js and cache.js.
+var versions = {"node_modules":{"react-dates":{"lib":{"css":{"_datepicker.css":"0837a81e0f469e1fdb3322742952346af2f41d38"},"components":{"DateRangePicker.js":"7b86e1491f271a190cbcd1ee0c9b064774762bc1","OutsideClickHandler.js":"cbc1c69e36c04598b46d4b4e2bc653536c6a0463","DateRangePickerInputController.js":"97e7ebfcaeb93024a6d98aee408aeac3332abf35","DateRangePickerInput.js":"1c71854abc9ee379bff6e17722d6eddc0b49148c","DateInput.js":"5ab2cd4ad3a9f336441622eeb2248615ca93b7b5","DayPickerRangeController.js":"319757219631a907c4bb1d40199e6697308d7a04","DayPicker.js":"b979dbc7420954fd884deba903f74374fc8546ab","CalendarMonthGrid.js":"c4478d4eec6ffcee1ff6dbcefde2bf60199e5dd6","CalendarMonth.js":"c0706456e657b840d6bc01b49dac718d5b9889ca","CalendarDay.js":"d4951c97f8f5757a352f4804fe60088c050a898a","DayPickerKeyboardShortcuts.js":"4fb79ee0fc10e094eb7961baf4383efb16f7fcb7","DayPickerNavigation.js":"a3d3a477041c77e8a566f1722ecf6a8bdf0f9680","SingleDatePicker.js":"992f791201953d9465eee90e487f7e93fbaa5cc9","DayPickerSingleDateController.js":"4a109a1807c1a613051e14b4cbe9087ee1999533","SingleDatePickerInput.js":"a041a0c0e5f4f4d683645ad90dc12550a383fb6a"},"defaultPhrases.js":"5e84bb2cea39ee30fa9a9ca94ac9cf886913aec5","utils":{"isInclusivelyAfterDay.js":"891608d123d1c8cede28da7c69dfba877d9271a6","isBeforeDay.js":"bd7e954cf6295a2228ea5cec43965488888eda2c","getResponsiveContainerStyles.js":"170eb0c7b723f0cc0228df8efd2495e281078103","getPhrasePropTypes.js":"c48a7975559c284092d02a18b943d9428e18a073","toISODateString.js":"206633b42cbf4748ee817702f452aa453cfb2dc8","toMomentObject.js":"7dc65a5a2044e58963dcb59032a178dbf5ed06b8","toLocalizedDateString.js":"45c095616f42cd4ef9b74b08841ac23446c6b349","isAfterDay.js":"fa57cd3de82a57f84210fb5df045a1e784f91ce8","isSameDay.js":"5f76495192f419ade672d714f6c4ad44b161f79e","isDayVisible.js":"1de2f2113b7bff8e75c45ea7bca8eff46acefb2b","toISOMonthString.js":"12bf32955f8769d6ec89ea433ae92a4354af8898","getVisibleDays.js":"a79f4e0d85f3f6cfa6c713b654d5889d6494d704","getCalendarMonthWidth.js":"1cbe2a834347abbc8f0c98c1ffde1c1571d1b235","getTransformStyles.js":"445218c58f8d9d65b4e786f63f11b78be15b9865","getActiveElement.js":"4fae77c27b2be2345b426f5135586a3674b93af3","isTransitionEndSupported.js":"91668096136d098ae6e9f3e93062e9d2861f7fbc","getCalendarMonthWeeks.js":"5b071058b2e2b8405ecd2aaefae361375606c880","getPhrase.js":"10217cf642db79e8b4dffadb1ad577dd41b0d8c4","isNextDay.js":"2bed4895a4292b53b70e09c7cc6e6e2cb2f9e91c","isInclusivelyBeforeDay.js":"aa235773bc8484682fd95618dcf70317cc9a08f6"},"shapes":{"DateRangePickerShape.js":"475eb6e0102531d298123ddbea276553d55dde83","FocusedInputShape.js":"3fe7acbb3b81152ffa9db7e98056f9a01a438e1c","IconPositionShape.js":"75ef44372334b8587aa2ff0e0f32bee895a616e6","OrientationShape.js":"f1cc4996fc3d4ae39897cdb026b8ad0c863594fd","AnchorDirectionShape.js":"61586e45828c5269161ed17504253474d3ec00f0","OpenDirectionShape.js":"e9ad854942232a7ef913d2c1c162393e92a969f8","DayOfWeekShape.js":"daace32c92287629c2eb4083af50ee4ef545f499","ScrollableOrientationShape.js":"e0f89435355558ca645285c087a3fcf46565b5f9","SingleDatePickerShape.js":"e380b9d4ebef2fccd193a9adc8468aae9522a39b"}},"package.json":"c3b6492752bfc574b919e6af4a2a50e4e51ede65","index.js":"a15349b9814456031fbe08af2030bbd67a343435","constants.js":"f865f5b8a8bde2c548b03749515ca8b5727b4dca"},"airbnb-prop-types":{"package.json":"85e1c3ed32b826225bfe3f68aa4ceece7e7a88ae","index.js":"4630363d03dc0f084d3f6427d86da3fe6d442182","build":{"mocks":{"index.js":"ac5f49a8df93607b928359843f9bf131c746eb2e"},"index.js":"b37fc4329c3aa280aa31d60d1379b0ba9c7cc262","and.js":"9d907dfb329cfa6c3825f2d5bb38033edc9f16aa","helpers":{"wrapValidator.js":"04dae8bb35484fd61cc2eeb22ce9aa72d59851d8","isPlainObject.js":"4438e90aa5466c9af54dfe0a0b7c7490c55a6574","isPrimitive.js":"261cef9a0f1b775c2fee4120c4dc969be1828f60","renderableChildren.js":"8e46eb28a2dd1fcdd98ab984abbf66c98b998a72","getComponentName.js":"2fae9c94b4b053ce6ac1872cd96d2664f8def2db","isInteger.js":"330e9f90456c31b677878a6e351cb6f9e8c0c44b","typeOf.js":"30e4d81a05671cd729a1a1d471cf08c684de94b8"},"between.js":"9c50ce113cc92e5e3b7e6116b23cd9d76b875a86","shape.js":"2ab1b084657019793277a2387bba39e8e0954d24","valuesOf.js":"a43541943fd42919611db08e2b9c5989f4a67f45","booleanSome.js":"ceda5896a8ae178ac8adf88186b0a6e2a3d36cb1","childrenHavePropXorChildren.js":"d0e583266cd7e6e0ef3208067de1f7074235d5a7","childrenOf.js":"154effdec4be3bb4d0843f1dd03a854d3cc59113","childrenOfType.js":"36a75eacde1d96dee5e831d2833c63890bbe58a4","childrenSequenceOf.js":"1feec9fe833a18af3d0eafa68bf4950c0ae2e2fc","sequenceOf.js":"14c47983e40677600ccc71a578beec17e38c70e4","nonNegativeInteger.js":"9de209174dc6af80bf2a511f7494cc9b3b8171f8","integer.js":"58168abd2989ace3e14fc4cc0fadb82c73754479","nonNegativeNumber.js":"8313a8312873d53d243e2a0f1c350357ea519c4a","object.js":"26f725fb7ce2b4d45c8740c70dd1ad3ab7fd4d73","withShape.js":"44372b684fad6ac55a79e46c0dc3efe4a1e59758","componentWithName.js":"2c5d35f4ac23feb0552e53b3863594ab7244ee8b","disallowedIf.js":"f1ad18ae308827bc16955ddf5d42800ca38c95c0","elementType.js":"ec45be07eee9a6914ebdde87b21f55cb7b4f57bc","empty.js":"23dcdb4b7704b23a02428c3abd6ab09f3b37f8a4","or.js":"700a24796b9831c5c6c23bc0f921c68cd47f9c8e","explicitNull.js":"ddaf2d09a07024cd656e83a7ec6f1d7d4f9a6e2e","keysOf.js":"86e4d04ee649f4fca489eb6de0fff01d1dd0fc5a","mutuallyExclusiveProps.js":"4860ba5a366b285919d21a8b1a4cdf029e15f701","mutuallyExclusiveTrueProps.js":"ac203ebffae1dad4053adc3822f0c3dccf5f012b","nChildren.js":"4ca9d748361dfeeb43369167e8cdb5ce485dee41","numericString.js":"10b8ea8f710e1cbb7af8d7e5e810107da19d900b","range.js":"d60d30e22857234d208611e0365135b2c0913312","ref.js":"a38b57fdaf6a98e3e8fe2a27da7b2992dd256514","requiredBy.js":"955300df563d4f69ec99dc51749e0d226f829e77","restrictedProp.js":"08aa22713f90159e63a6ab398e114146b842cab6","stringEndsWith.js":"b4b4ffd7cbe0cccadbbafae6bd52f0eb2f78c11f","stringStartsWith.js":"c0034d1da4788bd9242b1fcd5c0651eb031ae457","uniqueArray.js":"6431e1e4a1e08b5dde9c5d1203219d1e04aa0cbc","uniqueArrayOf.js":"aa3afe784a89ba2fe37783b0a4db9a0d85988949"}},"prop-types-exact":{"package.json":"556ca65a5d70c14d454c4e52bec2ca1697019a04","build":{"index.js":"aaec327ce549d0ab585ca58420e09844b0d75ad2","helpers":{"isPlainObject.js":"bb9f9aac3aef28efd43f2f14262e0a3179ef3725"}}},"object.assign":{"package.json":"db9131e17d74afd39e406632041b97686349fdec","index.js":"9f706693e58888072e8aef73685e1818482b0937","implementation.js":"0e49d46a17a57516bbe5ee5af138dca92c13747d","polyfill.js":"3f496c434bf06f70e0798c7e88e391e33e607e4c","shim.js":"d5d843abc6c911bd14db7bf0dbaa8a25f10882d7"},"define-properties":{"package.json":"957f655d33863f423145e85f813a64daf11c5fda","index.js":"ddf8efabfacde5e44127ed5fe94f237dcecf7f6c"},"object-keys":{"package.json":"fe2d571c868491c31e9198cb3060e7437d2f6c21","index.js":"fb47601919d415400bbecec0f92c93fb899c016e","isArguments.js":"3a5ec8f1c443c4999ce34c34b23113f940ad5462","implementation.js":"5fff82af853eaaf328af1c3a93033c4612efb114"},"function-bind":{"package.json":"a33591ddd09eeeac55e62f3cd93dddb5fe0fd2f7","index.js":"c3e280060734e4c91d6bf4a00ffa6abcaca49d6d","implementation.js":"62e1ab13a5e220236e2433fefb5bbebe384dbad0"},"has-symbols":{"shams.js":"547947162a87772746a85a9b203bfe1b84f99c8b","package.json":"ae66ce86c4326118c8d88a60b7b79e86dfac0b67","index.js":"659728c19fad03d61220ee8d848890e1a0eab029"},"has":{"package.json":"b05b49fb57587b1eb3b2e3f9a77e60c768cd880f","src":{"index.js":"13045addb0ee59e11dfd329b71a74b06131b36f9"}},"object.entries":{"package.json":"637f7cf5acdb78885c4795de4be3e70a14c24b7d","index.js":"6809f6fc6df4e2d941da0bcad01b5ea2ff4427f9","implementation.js":"70b1228135e4c3cef8f0b9dbb9a60da11eae886a","polyfill.js":"76834150df39274fca4e85d5c5c226ba9d3d0982","shim.js":"a50275162c24c2ee2c4b500c9d1ac6c070592ccc"},"es-abstract":{"es7.js":"6660ba814e87aeb16e8a05585ad2d30f3d08be2d","es2016.js":"6f38696b7f724c563006526e016a07cee3a4141f","GetIntrinsic.js":"39460eefd515c6db585368f8ba22f9b7562ada96","es2015.js":"c25787a5407dd06768a6727feb4afae81b6688c9","helpers":{"assertRecord.js":"d40775030f288e6fe13695102945e843b8a96114","isNaN.js":"eae5ac822b9ef4ff154d13532c72411c56ad2b10","isFinite.js":"797d5516e847a2168ffa3b781b55b8ee28a4eb67","assign.js":"a8a4aca20eb69b6abc43cfcb96c7717fbe032f1c","sign.js":"96dc3ef9b9befde4aba03e00b28099bb76df6d35","mod.js":"cb8b98ba3c5ea1e6c805248fdf74ba9a361c3949","isPrimitive.js":"b5f85470e75abd42a24b08fb8a0046ac6f7307f2","forEach.js":"e9a8310f5d8ab46062b4b8db492ccdede8ae9d45","every.js":"68ba9764ac551bc79892be2e3652348de985d0c0","isSamePropertyDescriptor.js":"0ef4d0832529f459abc004c99e566d02da24ef57","isPropertyDescriptor.js":"03cd8b15fc822f6896621775d00ad52c28098926","callBind.js":"8797a6680f52a7a83f5145b36b886523ec11aea2"},"es5.js":"b1173a6b5793407595328c7eaaabc6ab8609b0cc","es6.js":"6d07aaf52646319c414927c2a5a3ae8861e6bbae"},"es-to-primitive":{"es6.js":"303331a6a84246ad32f9c4fabf8843f015694993","es2015.js":"338d3b34a4d6fdedb3c1b7cfc204aaecea38e8a1","helpers":{"isPrimitive.js":"2a75456cde6ba020f1c344c67c0b23d5c465bb23"},"es5.js":"3223b2f0ca5f8619d00424cb7c6a401d3cecd97a"},"is-callable":{"package.json":"dcc07cc3e402db5e755e37b9b834b7e6734909ad","index.js":"7f75ff62a52b37edefce94f3ebf2859305154606"},"is-date-object":{"package.json":"6f8d07b51123b862ef8ea2fefd3bb15eca67627c","index.js":"c125d0010b63b51e906492e3555dc7e6b4058919"},"is-symbol":{"package.json":"3b8105c7c87b9c9d8c63aff2c0ea3e8c86f20800","index.js":"2f3a779b20fb69c42fae0f3383f47f0f932eefa9"},"object-inspect":{"package.json":"c0bbb0d26a52bd6b34bd243ab6dd3a6ce7e1b784","util.inspect.js":"536f47a1b41a69a26efbf976e1b376a34c3403b0","index.js":"7f7cce7875ef5c6da728f85f7f01c5162f251ef9"},"is-regex":{"package.json":"402119a852ba18281a55a97f68847af473953c8b","index.js":"1d0a9c2a39753726b2b643222285d44749a9cb8e"},"array.prototype.find":{"package.json":"3885b3149fb255c97e6aa3d7b23a655ed781854e","index.js":"f22aadab043e04591c5c3d8a160341bbcae910d0","implementation.js":"f1d1813ba8bff3ca6119b368c2066aae98d9d9cf","polyfill.js":"a72768994dec7cc62becc6be9c15aeebfc32cd17","shim.js":"b283aadd33a200a27769e2556603c666c031fa6f"},"function.prototype.name":{"package.json":"c1920ed6d71adae2e1c3233d3b63727168dc4c2a","index.js":"4ed0c2d9a18a7d6afb229466299dc524e1fdff12","implementation.js":"068273ecf290ef41737efbd8d69c4a1b022e1e76","polyfill.js":"cdd117a9deed0056b55469b2892bfc22fc38b097","shim.js":"bd69a884821ed12103d4a129471064a30a7596db"},"functions-have-names":{"package.json":"4dfbb219d349903207d24bcfc0e333339f6cf57e","index.js":"ba1d542ea33ba76776ae989d64f13781c9595e75"},"object-is":{"package.json":"cb9b435191c1d3d00b2e18968f46fed8c8dac646","index.js":"c67278572f81666a3a8a6e6b1f1c75fafdd505f2"},"is-touch-device":{"package.json":"0e1315faffb35e284b5562e853fd9dba7a4588ca","build":{"index.js":"b1787d929d60e76cba6f493e885ea28f8f38d2d6"}},"react-addons-shallow-compare":{"package.json":"f908f2ac4de80dc1b20ba2fbd20848a58a15aa2e","index.js":"3bf12f1eead1023bfb567132b775e77aeb8637e1"},"consolidated-events":{"package.json":"56a753cac153edc4bdc0aa4cff20808d74ce8134","lib":{"index.js":"0d8a085de19a302c19a93a733b58acec85ff2045","normalizeEventOptions.js":"cce10baee931c0b2a007802f47241809030bd59a","canUsePassiveEventListeners.js":"5d5a478397d2d91fb5bcfa62a083ac96677ae0c2","canUseDOM.js":"573021ffa33a318573cb09bab9d41e5360795293","TargetEventHandlers.js":"75f5e5afb6f64fc843b9c954e20afa90f1d93413","eventOptionsKey.js":"4ddc823c63450f0d555c0811876d2925c4e4ca8f"}},"react-portal":{"package.json":"68f29b3f1e057fb33febaf9312c9447ab3f15440","build":{"portal.js":"ba379032c9123ae715be2ffbd0d277323e719642"}},"react-moment-proptypes":{"package.json":"b65b91cca9d894868b324f0129d5a02314367d01","src":{"index.js":"169b6a14afe9edbae55d229cf579092f703000c3","moment-validation-wrapper.js":"1ce8297c8c4031551dc95d915b84bf86e23af51f","core.js":"875ffd54e5e02233b23396212379bbf887432c2a"}},"lodash":{"throttle.js":"220e5ec844762776be99f7ed97233de23f7768dc","debounce.js":"6d8ab8b32a394d8f8d60bc130f90af92cab4c24c","isObject.js":"4c1471eebc8e8248fc5299ead0d4e0c833fa0b53","now.js":"305007524c86c5cc58b912ae9e85b7f4deea1332","_root.js":"b91522b2498bac15a69400464aa1acd9ab65da3b","_freeGlobal.js":"f005ca2daa99313555a7e446daf2bb0781c403fa","toNumber.js":"1281d34a874252e1bc21a829dd9b0cc6ec0c1cd7","isSymbol.js":"aba5701711a43ea127e0002f2c079bfcfada0bea","_baseGetTag.js":"b64fbc7f2ff102c7d89b40b55498fd1d79d8c564","_Symbol.js":"3edd876f6ea6f3bc2d193c2b1fc6f6a76e6672b0","_getRawTag.js":"2cc6d27f73cbe3802b7cca519a62b0ab8a1bef36","_objectToString.js":"fbcbcd6912da86e87c3845e843d89e132871c309","isObjectLike.js":"eb008f25c2aa8f69696e307d5b1fab37da67e00f"},"object.values":{"package.json":"116dda0fd78bbad575334803922fea6f6fcfc523","index.js":"bf1e2512e68009d00e56f9e450b4b321e00d8e76","implementation.js":"99b8935e5bce1e593cae17d67175ccbd97c73cbf","polyfill.js":"ace7e970ab00d779d8df96a0f5389de42b437e68","shim.js":"f87b2a957f25e06c5189ede1f325e68bad016abd"}},"imports":{"ui":{"components":{"PickDates.js":"137f9f67d8e0984bfc81a659886b043ab4e52482"}}}};
+
+exports.get = function (id) {
+  var tree = versions;
+  var version = null;
+
+  id.split("/").some(function (part) {
+    if (part) {
+      // If the tree contains identifiers for Meteor packages with colons
+      // in their names, the colons should not have been replaced by
+      // underscores, but there's a bug that results in that behavior, so
+      // for now it seems safest to be tolerant of underscores here.
+      // https://github.com/meteor/meteor/pull/9103
+      tree = tree[part] || tree[part.replace(":", "_")];
+    }
+
+    if (! tree) {
+      // Terminate the search without reassigning version.
+      return true;
+    }
+
+    if (typeof tree === "string") {
+      version = tree;
+      return true;
+    }
+  });
+
+  return version;
+};
+
+function getFlatModuleArray(tree) {
+  var parts = [""];
+  var result = [];
+
+  function walk(t) {
+    if (t && typeof t === "object") {
+      Object.keys(t).forEach(function (key) {
+        parts.push(key);
+        walk(t[key]);
+        parts.pop();
+      });
+    } else if (typeof t === "string") {
+      result.push(parts.join("/"));
+    }
+  }
+
+  walk(tree);
+
+  return result;
+}
+
+// If Package.appcache is loaded, preload additional modules after the
+// core bundle has been loaded.
+function precacheOnLoad(event) {
+  // Check inside onload to make sure Package.appcache has had a chance to
+  // become available.
+  if (! Package.appcache) {
+    return;
+  }
+
+  // Prefetch in chunks to reduce overhead. If we call module.prefetch(id)
+  // multiple times in the same tick of the event loop, all those modules
+  // will be fetched in one HTTP POST request.
+  function prefetchInChunks(modules, amount) {
+    Promise.all(modules.splice(0, amount).map(function (id) {
+      return module.prefetch(id);
+    })).then(function () {
+      if (modules.length > 0) {
+        setTimeout(function () {
+          prefetchInChunks(modules, amount);
+        }, 0);
+      }
+    });
+  }
+
+  // Get a flat array of modules and start prefetching.
+  prefetchInChunks(getFlatModuleArray(versions), 50);
+}
+
+// Use window.onload to only prefetch after the main bundle has loaded.
+if (global.addEventListener) {
+  global.addEventListener('load', precacheOnLoad, false);
+} else if (global.attachEvent) {
+  global.attachEvent('onload', precacheOnLoad);
+}
+
 /////////////////////////////////////////////////////////////////////////////////
 
 }}}}},{
@@ -411,10 +518,10 @@ module.exports = {"node_modules":{"react-dates":{"lib":{"css":{"_datepicker.css"
     ".json"
   ]
 });
-var exports = require("./node_modules/meteor/dynamic-import/client.js");
+
+var exports = require("/node_modules/meteor/dynamic-import/client.js");
 
 /* Exports */
-if (typeof Package === 'undefined') Package = {};
-Package['dynamic-import'] = exports;
+Package._define("dynamic-import", exports);
 
 })();

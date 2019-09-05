@@ -28,12 +28,19 @@
       "path": "packages/modules.js"
     },
     {
+      "path": "packages/modern-browsers.js"
+    },
+    {
       "node_modules": "npm/node_modules/meteor/es5-shim/node_modules",
       "path": "packages/es5-shim.js"
     },
     {
       "node_modules": "npm/node_modules/meteor/promise/node_modules",
       "path": "packages/promise.js"
+    },
+    {
+      "node_modules": "npm/node_modules/meteor/ecmascript-runtime-client/node_modules",
+      "path": "packages/ecmascript-runtime-client.js"
     },
     {
       "node_modules": "npm/node_modules/meteor/ecmascript-runtime-server/node_modules",
@@ -48,52 +55,82 @@
       "path": "packages/ecmascript.js"
     },
     {
-      "path": "packages/underscore.js"
-    },
-    {
-      "path": "packages/base64.js"
-    },
-    {
-      "path": "packages/ejson.js"
-    },
-    {
-      "path": "packages/id-map.js"
-    },
-    {
-      "path": "packages/ordered-dict.js"
-    },
-    {
-      "path": "packages/tracker.js"
-    },
-    {
       "node_modules": "npm/node_modules/meteor/babel-runtime/node_modules",
       "path": "packages/babel-runtime.js"
     },
     {
-      "sourceMap": "packages/random.js.map",
-      "path": "packages/random.js"
+      "node_modules": "npm/node_modules/meteor/fetch/node_modules",
+      "path": "packages/fetch.js"
     },
     {
-      "path": "packages/mongo-id.js"
+      "node_modules": "npm/node_modules/meteor/inter-process-messaging/node_modules",
+      "path": "packages/inter-process-messaging.js"
     },
     {
+      "path": "packages/dynamic-import.js"
+    },
+    {
+      "sourceMap": "packages/base64.js.map",
+      "path": "packages/base64.js"
+    },
+    {
+      "sourceMap": "packages/ejson.js.map",
+      "path": "packages/ejson.js"
+    },
+    {
+      "sourceMap": "packages/diff-sequence.js.map",
       "path": "packages/diff-sequence.js"
     },
     {
       "path": "packages/geojson-utils.js"
     },
     {
+      "sourceMap": "packages/id-map.js.map",
+      "path": "packages/id-map.js"
+    },
+    {
+      "sourceMap": "packages/random.js.map",
+      "path": "packages/random.js"
+    },
+    {
+      "sourceMap": "packages/mongo-id.js.map",
+      "path": "packages/mongo-id.js"
+    },
+    {
+      "sourceMap": "packages/ordered-dict.js.map",
+      "path": "packages/ordered-dict.js"
+    },
+    {
+      "sourceMap": "packages/tracker.js.map",
+      "path": "packages/tracker.js"
+    },
+    {
       "sourceMap": "packages/minimongo.js.map",
       "path": "packages/minimongo.js"
     },
     {
+      "sourceMap": "packages/check.js.map",
       "path": "packages/check.js"
     },
     {
+      "sourceMap": "packages/retry.js.map",
       "path": "packages/retry.js"
     },
     {
+      "sourceMap": "packages/callback-hook.js.map",
+      "path": "packages/callback-hook.js"
+    },
+    {
+      "sourceMap": "packages/ddp-common.js.map",
       "path": "packages/ddp-common.js"
+    },
+    {
+      "path": "packages/reload.js"
+    },
+    {
+      "node_modules": "npm/node_modules/meteor/socket-stream-client/node_modules",
+      "sourceMap": "packages/socket-stream-client.js.map",
+      "path": "packages/socket-stream-client.js"
     },
     {
       "node_modules": "npm/node_modules/meteor/ddp-client/node_modules",
@@ -101,6 +138,10 @@
       "path": "packages/ddp-client.js"
     },
     {
+      "path": "packages/underscore.js"
+    },
+    {
+      "sourceMap": "packages/rate-limit.js.map",
       "path": "packages/rate-limit.js"
     },
     {
@@ -108,51 +149,17 @@
     },
     {
       "node_modules": "npm/node_modules/meteor/logging/node_modules",
+      "sourceMap": "packages/logging.js.map",
       "path": "packages/logging.js"
     },
     {
+      "sourceMap": "packages/routepolicy.js.map",
       "path": "packages/routepolicy.js"
     },
     {
-      "path": "packages/deps.js"
-    },
-    {
-      "path": "packages/htmljs.js"
-    },
-    {
-      "path": "packages/html-tools.js"
-    },
-    {
-      "path": "packages/blaze-tools.js"
-    },
-    {
-      "node_modules": "npm/node_modules/meteor/spacebars-compiler/node_modules",
-      "path": "packages/spacebars-compiler.js"
-    },
-    {
-      "path": "packages/observe-sequence.js"
-    },
-    {
-      "path": "packages/jquery.js"
-    },
-    {
-      "path": "packages/reactive-var.js"
-    },
-    {
-      "path": "packages/blaze.js"
-    },
-    {
-      "path": "packages/spacebars.js"
-    },
-    {
-      "path": "packages/ui.js"
-    },
-    {
-      "path": "packages/boilerplate-generator.js",
-      "assets": {
-        "boilerplate_web.browser.html": "assets/packages/boilerplate-generator/boilerplate_web.browser.html",
-        "boilerplate_web.cordova.html": "assets/packages/boilerplate-generator/boilerplate_web.cordova.html"
-      }
+      "node_modules": "npm/node_modules/meteor/boilerplate-generator/node_modules",
+      "sourceMap": "packages/boilerplate-generator.js.map",
+      "path": "packages/boilerplate-generator.js"
     },
     {
       "sourceMap": "packages/webapp-hashing.js.map",
@@ -167,9 +174,6 @@
       "path": "packages/audit-argument-checks.js"
     },
     {
-      "path": "packages/callback-hook.js"
-    },
-    {
       "node_modules": "npm/node_modules/meteor/ddp-server/node_modules",
       "sourceMap": "packages/ddp-server.js.map",
       "path": "packages/ddp-server.js"
@@ -182,12 +186,24 @@
       "path": "packages/allow-deny.js"
     },
     {
+      "path": "packages/mongo-dev-server.js"
+    },
+    {
+      "node_modules": "npm/node_modules/meteor/mongo-decimal/node_modules",
+      "sourceMap": "packages/mongo-decimal.js.map",
+      "path": "packages/mongo-decimal.js"
+    },
+    {
+      "sourceMap": "packages/binary-heap.js.map",
       "path": "packages/binary-heap.js"
     },
     {
       "node_modules": "npm/node_modules/meteor/mongo/node_modules",
       "sourceMap": "packages/mongo.js.map",
       "path": "packages/mongo.js"
+    },
+    {
+      "path": "packages/reactive-var.js"
     },
     {
       "path": "packages/session.js"
@@ -210,6 +226,7 @@
       "path": "packages/sha.js"
     },
     {
+      "sourceMap": "packages/srp.js.map",
       "path": "packages/srp.js"
     },
     {
@@ -274,15 +291,12 @@
       "path": "packages/tmeasday_check-npm-versions.js"
     },
     {
+      "node_modules": "npm/node_modules/meteor/aldeed_collection2-core/node_modules",
       "sourceMap": "packages/aldeed_collection2-core.js.map",
       "path": "packages/aldeed_collection2-core.js"
     },
     {
       "path": "packages/livedata.js"
-    },
-    {
-      "sourceMap": "packages/dynamic-import.js.map",
-      "path": "packages/dynamic-import.js"
     },
     {
       "path": "packages/hot-code-push.js"
@@ -291,14 +305,15 @@
       "path": "packages/launch-screen.js"
     },
     {
+      "sourceMap": "packages/autoupdate.js.map",
       "path": "packages/autoupdate.js"
     },
     {
-      "path": "packages/reload.js"
-    },
-    {
       "node_modules": "npm/node_modules",
-      "path": "packages/global-imports.js"
+      "path": "app/global-imports.js",
+      "assets": {
+        "README.md": "assets/app/README.md"
+      }
     },
     {
       "node_modules": "npm/node_modules",

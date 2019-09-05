@@ -164,7 +164,7 @@ var _ = require('underscore');
 
 var Fiber = require('fibers');
 
-var enabled = !!process.env['METEOR_PROFILE'];
+Profile.enabled = !!process.env['METEOR_PROFILE'];
 var filter = parseFloat(process.env['METEOR_PROFILE']); // ms
 
 if (isNaN(filter)) {
@@ -253,8 +253,8 @@ var start = function () {
   running = true;
 };
 
-var Profile = function (bucketName, f) {
-  if (!enabled) {
+function Profile(bucketName, f) {
+  if (!Profile.enabled) {
     return f;
   }
 
@@ -303,7 +303,7 @@ var Profile = function (bucketName, f) {
       throw err;
     }
   }, f);
-};
+}
 
 var time = function (bucket, f) {
   return Profile(bucket, f)();
@@ -437,8 +437,8 @@ var leafTotals = function (leafName) {
   });
 
   return {
-    time: time,
-    count: count
+    time,
+    count
   };
 };
 
@@ -465,7 +465,7 @@ var reportHotLeaves = function () {
       return;
     }
 
-    print(leftRightDots(total.name, formatMs(total.time), 65) + (" (" + total.count + ")"));
+    print(leftRightDots(total.name, formatMs(total.time), 65) + ` (${total.count})`);
   });
 };
 
@@ -490,7 +490,7 @@ var setupReport = function () {
 var reportNum = 1;
 
 var report = function () {
-  if (!enabled) {
+  if (!Profile.enabled) {
     return;
   }
 
@@ -501,12 +501,12 @@ var report = function () {
   print('');
   reportHotLeaves();
   print('');
-  print("(#" + reportNum + ") Total: " + formatMs(getTopLevelTotal()) + (" (" + runningName + ")"));
+  print(`(#${reportNum}) Total: ${formatMs(getTopLevelTotal())}` + ` (${runningName})`);
   print('');
 };
 
 var run = function (bucketName, f) {
-  if (!enabled) {
+  if (!Profile.enabled) {
     return f();
   } else if (running) {
     // We've kept the calls to Profile.run in the tool disjoint so far,
@@ -515,7 +515,7 @@ var run = function (bucketName, f) {
     return time(bucketName, f);
   } else {
     runningName = bucketName;
-    print("(#" + reportNum + ") Profiling: " + runningName);
+    print(`(#${reportNum}) Profiling: ${runningName}`);
     start();
 
     try {

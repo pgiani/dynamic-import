@@ -3,7 +3,6 @@
 
 
 /* Exports */
-if (typeof Package === 'undefined') Package = {};
-Package.session = {};
+Package._define("session");
 
 })();
