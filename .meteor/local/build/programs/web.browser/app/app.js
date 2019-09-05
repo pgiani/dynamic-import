@@ -423,43 +423,19 @@ var renderNavigation = function (hasUser) {                                     
   return hasUser ? React.createElement(AuthenticatedNavigation, null) : React.createElement(PublicNavigation, null);
 };                                                                                                                   // 10
                                                                                                                      //
-var AppNavigation = function (_ref) {                                                                                // 12
-  var hasUser = _ref.hasUser;                                                                                        // 12
-  return React.createElement(                                                                                        // 12
-    Navbar,                                                                                                          // 13
-    null,                                                                                                            // 13
-    React.createElement(                                                                                             // 14
-      Navbar.Header,                                                                                                 // 14
-      null,                                                                                                          // 14
-      React.createElement(                                                                                           // 15
-        Navbar.Brand,                                                                                                // 15
-        null,                                                                                                        // 15
-        React.createElement(                                                                                         // 16
-          Link,                                                                                                      // 16
-          {                                                                                                          // 16
-            to: "/"                                                                                                  // 16
-          },                                                                                                         // 16
-          "meteor-example-optimize-client-bundle"                                                                    // 16
-        )                                                                                                            // 16
-      ),                                                                                                             // 15
-      React.createElement(Navbar.Toggle, null)                                                                       // 18
-    ),                                                                                                               // 14
-    React.createElement(                                                                                             // 20
-      Navbar.Collapse,                                                                                               // 20
-      null,                                                                                                          // 20
-      renderNavigation(hasUser)                                                                                      // 21
-    )                                                                                                                // 20
-  );                                                                                                                 // 13
-};                                                                                                                   // 12
+var AppNavigation = function (_ref) {                                                                                // 13
+  var hasUser = _ref.hasUser;                                                                                        // 13
+  return React.createElement(Navbar, null);                                                                          // 13
+};                                                                                                                   // 13
                                                                                                                      //
-AppNavigation.propTypes = {                                                                                          // 26
-  hasUser: PropTypes.object                                                                                          // 27
-};                                                                                                                   // 26
+AppNavigation.propTypes = {                                                                                          // 15
+  hasUser: PropTypes.object                                                                                          // 16
+};                                                                                                                   // 15
 module.exportDefault(container(function (props, onData) {                                                            // 1
-  onData(null, {                                                                                                     // 31
-    hasUser: Meteor.user()                                                                                           // 31
-  });                                                                                                                // 31
-}, AppNavigation));                                                                                                  // 32
+  onData(null, {                                                                                                     // 20
+    hasUser: Meteor.user()                                                                                           // 20
+  });                                                                                                                // 20
+}, AppNavigation));                                                                                                  // 21
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 },"AuthenticatedNavigation.js":function(require,exports,module){

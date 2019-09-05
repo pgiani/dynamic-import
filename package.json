@@ -1,5 +1,5 @@
 {
-  "name": "meteor-example-optimize-client-bundle",
+  "name": "meteor-dynamic-import-issue",
   "private": true,
   "scripts": {
     "start": "meteor --settings settings-development.json --port 8000",

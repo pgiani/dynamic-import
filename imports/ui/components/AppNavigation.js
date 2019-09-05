@@ -7,21 +7,10 @@ import PublicNavigation from './PublicNavigation.js';
 import AuthenticatedNavigation from './AuthenticatedNavigation.js';
 import container from '../../modules/container';
 
-const renderNavigation = hasUser => (hasUser ? <AuthenticatedNavigation /> : <PublicNavigation />);
+const renderNavigation = hasUser =>
+  hasUser ? <AuthenticatedNavigation /> : <PublicNavigation />;
 
-const AppNavigation = ({ hasUser }) => (
-  <Navbar>
-    <Navbar.Header>
-      <Navbar.Brand>
-        <Link to="/">meteor-example-optimize-client-bundle</Link>
-      </Navbar.Brand>
-      <Navbar.Toggle />
-    </Navbar.Header>
-    <Navbar.Collapse>
-      { renderNavigation(hasUser) }
-    </Navbar.Collapse>
-  </Navbar>
-);
+const AppNavigation = ({ hasUser }) => <Navbar></Navbar>;
 
 AppNavigation.propTypes = {
   hasUser: PropTypes.object,
